@@ -11,5 +11,9 @@ from helpers.time import days
 """
 
 
-def test_my_custom_test(deployed):
+def test_wait_for_all_locks_can_withdraw_easy(deployed):
+    assert False
+
+
+def test_if_not_wait_withdrawal_reverts(deployed):
     assert False
