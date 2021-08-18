@@ -17,3 +17,6 @@ def test_wait_for_all_locks_can_withdraw_easy(deployed):
 
 def test_if_not_wait_withdrawal_reverts(deployed):
     assert False
+
+def test_delegation_was_correct(deployed):
+  assert False

@@ -1,5 +1,6 @@
 from brownie import (
     accounts,
+    a,
     interface,
     Controller,
     SettV3,
@@ -7,6 +8,7 @@ from brownie import (
     CvxLocker,
     CvxStakingProxy,
 )
+from brownie.network.account import Account
 from config import (
     BADGER_DEV_MULTISIG,
     WANT,
@@ -18,9 +20,32 @@ from config import (
 from dotmap import DotMap
 import pytest
 
+@pytest.fixture
+def deployer():
+    return accounts[0]
+
+## CVX Locker ##
+@pytest.fixture
+def cvxcrv():
+    return "0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7"
+
 
 @pytest.fixture
-def deployed():
+def locker(deployer, cvxcrv):
+    ## From https://github.com/convex-eth/platform/blob/5f6682012a6d983af3500abfb49a1bce5f6c5837/contracts/test/24_LockTests.js#L83-L89
+
+    locker = CvxLocker.deploy({"from": deployer})
+    stakeproxy = CvxStakingProxy.deploy(locker, {"from": deployer})
+    stakeproxy.setApprovals()
+
+    locker.addReward(cvxcrv, stakeproxy, False, {"from": deployer})
+    locker.setStakingContract(stakeproxy, {"from": deployer})
+    locker.setApprovals()
+
+    return locker
+
+@pytest.fixture
+def deployed(locker):
     """
     Deploys, vault, controller and strats and wires them up for you to test
     """
@@ -67,6 +92,7 @@ def deployed():
         guardian,
         PROTECTED_TOKENS,
         FEES,
+        locker ## NOTE: We have to do this only until CVX deploys to mainnet
     )
 
     ## Tool that verifies bytecode (run independently) <- Webapp for anyone to verify
@@ -81,15 +107,9 @@ def deployed():
     controller.approveStrategy(WANT, strategy, {"from": governance})
     controller.setStrategy(WANT, strategy, {"from": deployer})
 
-    ## Uniswap some tokens here
-    router = interface.IUniswapRouterV2("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D")
-    router.swapExactETHForTokens(
-        0,  ## Mint out
-        ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", WANT],
-        deployer,
-        9999999999999999,
-        {"from": deployer, "value": 5000000000000000000},
-    )
+    ## Send from a whale of CVX
+    whale = accounts.at("0x5F465e9fcfFc217c5849906216581a657cd60605", force=True)
+    want.transfer(a[0], 10000 * 10 **18, {"from": whale}) ## 10k CVX
 
     return DotMap(
         deployer=deployer,
@@ -140,11 +160,6 @@ def tokens():
 
 ## Accounts ##
 @pytest.fixture
-def deployer(deployed):
-    return deployed.deployer
-
-
-@pytest.fixture
 def strategist(strategy):
     return accounts.at(strategy.strategist(), force=True)
 
@@ -159,22 +174,4 @@ def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
 
 
-## CVX Locker ##
-@pytest.fixture
-def cvxcrv(deployer):
-    return "0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7"
 
-
-@pytest.fixture
-def locker(deployer, cvxcrv):
-    ## From https://github.com/convex-eth/platform/blob/5f6682012a6d983af3500abfb49a1bce5f6c5837/contracts/test/24_LockTests.js#L83-L89
-
-    locker = CvxLocker.deploy({"from": deployer})
-    stakeproxy = CvxStakingProxy.deploy(locker, {"from": deployer})
-    stakeproxy.setApprovals()
-
-    locker.addReward(cvxcrv, stakeproxy, {"from": deployer})
-    locker.setStakingContract(stakeproxy, {"from": deployer})
-    locker.setApprovals()
-
-    return locker

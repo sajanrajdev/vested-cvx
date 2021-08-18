@@ -12,6 +12,7 @@ import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgrade
 import "../interfaces/uniswap/IUniswapRouterV2.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
+import "../interfaces/snapshot/IDelegateRegistry.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
@@ -27,6 +28,13 @@ contract MyStrategy is BaseStrategy {
 
     address public constant SUSHI_ROUTER =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+
+    IDelegateRegistry public constant SNAPSHOT =
+        IDelegateRegistry(0x469788fE6E9E9681C6ebF3bF78e7Fd26Fc015446);
+
+    // The address this strategies delegates voting to
+    address public constant DELEGATE =
+        0xB65cef03b9B89f99517643226d76e286ee999e77;
 
     ICvxLocker public LOCKER;
 
@@ -69,8 +77,14 @@ contract MyStrategy is BaseStrategy {
 
         /// @dev do one off approvals here
         // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
+        // Permissions for Locker
+        IERC20Upgradeable(want).safeApprove(_locker, type(uint256).max);
 
-        ///@dev TODO: Delegate voting to XYZ Wallet here
+        // Permissions for Sushiswap
+        IERC20Upgradeable(reward).safeApprove(SUSHI_ROUTER, type(uint256).max);
+
+        // Delegate voting to DELEGATE
+        SNAPSHOT.setDelegate(keccak256("cvx.eth"), DELEGATE);
     }
 
     /// ===== View Functions =====
@@ -212,6 +226,10 @@ contract MyStrategy is BaseStrategy {
 
     function _swapcvxCRVToWant() internal {
         uint256 toSwap = IERC20Upgradeable(reward).balanceOf(address(this));
+
+        if (toSwap == 0) {
+            return;
+        }
 
         // Sushi reward to WETH to want
         address[] memory path = new address[](3);
