@@ -9,6 +9,7 @@ import "../deps/@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
+import "../interfaces/uniswap/IUniswapRouterV2.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
 
@@ -22,6 +23,10 @@ contract MyStrategy is BaseStrategy {
     // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
     address public lpComponent; // Token we provide liquidity with
     address public reward; // Token we farm and swap to want / lpComponent
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+    address public constant SUSHI_ROUTER =
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
     ICvxLocker public LOCKER;
 
@@ -137,9 +142,8 @@ contract MyStrategy is BaseStrategy {
     function _withdrawAll() internal override {
         //NOTE: This probably will always fail unless we have all tokens expired
         require(
-            LOCKER.lockedBalanceOf(
-                address(this) == LOCKER.balanceOf(address(this))
-            ),
+            LOCKER.lockedBalanceOf(address(this)) ==
+                LOCKER.balanceOf(address(this)),
             "Need to wait for complete unlock"
         );
 
@@ -181,7 +185,11 @@ contract MyStrategy is BaseStrategy {
 
         uint256 _before = IERC20Upgradeable(want).balanceOf(address(this));
 
-        // Write your code here
+        // Get cvxCRV
+        LOCKER.getReward(address(this), false);
+
+        // Swap cvxCRV for want (CVX)
+        _swapcvxCRVToWant();
 
         uint256 earned =
             IERC20Upgradeable(want).balanceOf(address(this)).sub(_before);
@@ -190,23 +198,6 @@ contract MyStrategy is BaseStrategy {
         (uint256 governancePerformanceFee, uint256 strategistPerformanceFee) =
             _processPerformanceFees(earned);
 
-        // TODO: If you are harvesting a reward token you're not compounding
-        // You probably still want to capture fees for it
-        // // Process Sushi rewards if existing
-        // if (sushiAmount > 0) {
-        //     // Process fees on Sushi Rewards
-        //     // NOTE: Use this to receive fees on the reward token
-        //     _processRewardsFees(sushiAmount, SUSHI_TOKEN);
-
-        //     // Transfer balance of Sushi to the Badger Tree
-        //     // NOTE: Send reward to badgerTree
-        //     uint256 sushiBalance = IERC20Upgradeable(SUSHI_TOKEN).balanceOf(address(this));
-        //     IERC20Upgradeable(SUSHI_TOKEN).safeTransfer(badgerTree, sushiBalance);
-        //
-        //     // NOTE: Signal the amount of reward sent to the badger tree
-        //     emit TreeDistribution(SUSHI_TOKEN, sushiBalance, block.number, block.timestamp);
-        // }
-
         /// @dev Harvest event that every strategy MUST have, see BaseStrategy
         emit Harvest(earned, block.number);
 
@@ -214,16 +205,26 @@ contract MyStrategy is BaseStrategy {
         return earned;
     }
 
-    // Alternative Harvest with Price received from harvester, used to avoid exessive front-running
-    function harvest(uint256 price)
-        external
-        whenNotPaused
-        returns (uint256 harvested)
-    {}
-
     /// @dev Rebalance, Compound or Pay off debt here
     function tend() external whenNotPaused {
         _onlyAuthorizedActors();
+    }
+
+    function _swapcvxCRVToWant() internal {
+        uint256 toSwap = IERC20Upgradeable(reward).balanceOf(address(this));
+
+        // Sushi reward to WETH to want
+        address[] memory path = new address[](3);
+        path[0] = reward;
+        path[1] = WETH;
+        path[2] = want;
+        IUniswapRouterV2(SUSHI_ROUTER).swapExactTokensForTokens(
+            toSwap,
+            0,
+            path,
+            address(this),
+            now
+        );
     }
 
     /// ===== Internal Helper Functions =====
