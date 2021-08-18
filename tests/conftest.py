@@ -4,6 +4,8 @@ from brownie import (
     Controller,
     SettV3,
     MyStrategy,
+    CvxLocker,
+    CvxStakingProxy,
 )
 from config import (
     BADGER_DEV_MULTISIG,
@@ -103,8 +105,6 @@ def deployed():
 
 
 ## Contracts ##
-
-
 @pytest.fixture
 def vault(deployed):
     return deployed.vault
@@ -139,8 +139,6 @@ def tokens():
 
 
 ## Accounts ##
-
-
 @pytest.fixture
 def deployer(deployed):
     return deployed.deployer
@@ -159,3 +157,24 @@ def settKeeper(vault):
 @pytest.fixture
 def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
+
+
+## CVX Locker ##
+@pytest.fixture
+def cvxcrv(deployer):
+    return "0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7"
+
+
+@pytest.fixture
+def locker(deployer, cvxcrv):
+    ## From https://github.com/convex-eth/platform/blob/5f6682012a6d983af3500abfb49a1bce5f6c5837/contracts/test/24_LockTests.js#L83-L89
+
+    locker = CvxLocker.deploy({"from": deployer})
+    stakeproxy = CvxStakingProxy.deploy(locker, {"from": deployer})
+    stakeproxy.setApprovals()
+
+    locker.addReward(cvxcrv, stakeproxy, {"from": deployer})
+    locker.setStakingContract(stakeproxy, {"from": deployer})
+    locker.setApprovals()
+
+    return locker
