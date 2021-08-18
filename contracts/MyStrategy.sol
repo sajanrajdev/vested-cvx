@@ -10,6 +10,7 @@ import "../deps/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
 import "../interfaces/badger/IController.sol";
+import "../interfaces/cvx/ICvxLocker.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
@@ -21,6 +22,8 @@ contract MyStrategy is BaseStrategy {
     // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
     address public lpComponent; // Token we provide liquidity with
     address public reward; // Token we farm and swap to want / lpComponent
+
+    ICvxLocker public LOCKER;
 
     // Used to signal to the Badger Tree that rewards where sent to it
     event TreeDistribution(
@@ -37,7 +40,8 @@ contract MyStrategy is BaseStrategy {
         address _keeper,
         address _guardian,
         address[3] memory _wantConfig,
-        uint256[3] memory _feeConfig
+        uint256[3] memory _feeConfig,
+        address _locker ///@dev TODO: Add this to deploy
     ) public initializer {
         __BaseStrategy_init(
             _governance,
@@ -56,25 +60,30 @@ contract MyStrategy is BaseStrategy {
         performanceFeeStrategist = _feeConfig[1];
         withdrawalFee = _feeConfig[2];
 
+        LOCKER = ICvxLocker(_locker);
+
         /// @dev do one off approvals here
         // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
+
+        ///@dev TODO: Delegate voting to XYZ Wallet here
     }
 
     /// ===== View Functions =====
 
-    // @dev Specify the name of the strategy
+    /// @dev Specify the name of the strategy
     function getName() external pure override returns (string memory) {
-        return "StrategyName";
+        return "veCVX Voting Strategy";
     }
 
-    // @dev Specify the version of the Strategy, for upgrades
+    /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
         return "1.0";
     }
 
     /// @dev Balance of want currently held in strategy positions
     function balanceOfPool() public view override returns (uint256) {
-        return 0;
+        // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
+        return LOCKER.lockedBalanceOf(address(this));
     }
 
     /// @dev Returns true if this strategy requires tending
@@ -119,10 +128,24 @@ contract MyStrategy is BaseStrategy {
     /// @dev invest the amount of want
     /// @notice When this function is called, the controller has already sent want to this
     /// @notice Just get the current balance and then invest accordingly
-    function _deposit(uint256 _amount) internal override {}
+    function _deposit(uint256 _amount) internal override {
+        // Lock tokens for 16 weeks, send credit to strat, always use max boost cause why not?
+        LOCKER.lock(address(this), _amount, LOCKER.maximumBoostPayment());
+    }
 
     /// @dev utility function to withdraw everything for migration
-    function _withdrawAll() internal override {}
+    function _withdrawAll() internal override {
+        //NOTE: This probably will always fail unless we have all tokens expired
+        require(
+            LOCKER.lockedBalanceOf(
+                address(this) == LOCKER.balanceOf(address(this))
+            ),
+            "Need to wait for complete unlock"
+        );
+
+        // Withdraw all we can
+        LOCKER.processExpiredLocks(false);
+    }
 
     /// @dev withdraw the specified amount of want, liquidate from lpComponent to want, paying off any necessary debt for the conversion
     function _withdrawSome(uint256 _amount)
@@ -130,6 +153,25 @@ contract MyStrategy is BaseStrategy {
         override
         returns (uint256)
     {
+        // TODO: Revert if we have tons locked
+
+        // Withdrawable
+        uint256 withdrawable =
+            LOCKER.lockedBalanceOf(address(this)).sub(
+                LOCKER.balanceOf(address(this))
+            );
+
+        require(withdrawable > _amount, "Tokens are still locked, please wait");
+
+        // Withdraw all we can
+        LOCKER.processExpiredLocks(false);
+
+        //TODO: CHECK | We still may end up with less (I guess)
+        uint256 avail = IERC20Upgradeable(want).balanceOf(address(this));
+        if (avail < _amount) {
+            return avail;
+        }
+
         return _amount;
     }
 
