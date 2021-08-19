@@ -35,10 +35,6 @@ def test_is_profitable(deployed):
     with brownie.reverts("onlyAuthorizedActors"):
         vault.earn({"from": randomUser})
 
-    min = vault.min()
-    max = vault.max()
-    remain = max - min
-
     snap.settEarn({"from": settKeeper})
 
     chain.sleep(15)

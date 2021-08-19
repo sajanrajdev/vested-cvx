@@ -7,6 +7,7 @@ from brownie import (
     MyStrategy,
     CvxLocker,
     CvxStakingProxy,
+    Contract
 )
 from brownie.network.account import Account
 from config import (
@@ -122,6 +123,10 @@ def deployed(locker):
         lpComponent=lpComponent,
         rewardToken=rewardToken,
     )
+
+@pytest.fixture
+def delegation_registry():
+    return Contract.from_explorer("0x469788fE6E9E9681C6ebF3bF78e7Fd26Fc015446")
 
 
 ## Contracts ##

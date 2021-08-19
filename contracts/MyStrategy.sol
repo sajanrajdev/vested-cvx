@@ -179,7 +179,10 @@ contract MyStrategy is BaseStrategy {
                 LOCKER.balanceOf(address(this))
             );
 
-        require(withdrawable > _amount, "Tokens are still locked, please wait");
+        require(
+            withdrawable >= _amount,
+            "Tokens are still locked, please wait"
+        );
 
         // Withdraw all we can
         LOCKER.processExpiredLocks(false);

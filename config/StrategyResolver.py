@@ -10,14 +10,11 @@ class StrategyResolver(StrategyCoreResolver):
             Track balances for all strategy implementations
             (Strategy Must Implement)
         """
-        # E.G
-        # strategy = self.manager.strategy
-        # return {
-        #     "gauge": strategy.gauge(),
-        #     "mintr": strategy.mintr(),
-        # }
+        strategy = self.manager.strategy
 
-        return {}
+        return {
+            "locker": strategy.LOCKER()
+        }
 
     def hook_after_confirm_withdraw(self, before, after, params):
         """
@@ -40,8 +37,10 @@ class StrategyResolver(StrategyCoreResolver):
         Specifies extra check for ordinary operation on earn
         Use this to verify that balances in the get_strategy_destinations are properly set
         """
-        ## TODO: Verify that balance of lock increases
-        assert False
+        ## Verify that balance of lock increases
+        # assert after.balances("want", "locker.IConvexRewards") > before.balances("want", "locker.IConvexRewards")
+        ## NOTE: Locker will send to stakingProxy, due to "double nested" this is tested on a custom test
+        assert True
 
     def confirm_harvest(self, before, after, tx):
         """
