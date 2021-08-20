@@ -46,6 +46,10 @@ def locker(deployer, cvxcrv):
     return locker
 
 @pytest.fixture
+def staking():
+    return Contract.from_explorer("0xCF50b810E57Ac33B91dCF525C6ddd9881B139332")
+
+@pytest.fixture
 def deployed(locker):
     """
     Deploys, vault, controller and strats and wires them up for you to test

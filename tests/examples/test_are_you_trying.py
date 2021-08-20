@@ -2,7 +2,7 @@ from brownie import *
 from helpers.constants import MaxUint256
 
 
-def test_are_you_trying(deployer, sett, strategy, want):
+def test_are_you_trying(deployer, sett, strategy, want, locker):
     """
     Verifies that you set up the Strategy properly
     """
@@ -25,7 +25,7 @@ def test_are_you_trying(deployer, sett, strategy, want):
 
     sett.earn({"from": deployer})
 
-    chain.sleep(10000 * 13)  # Mine so we get some interest
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
 
     ## TEST 1: Does the want get used in any way?
     assert want.balanceOf(sett) == depositAmount - available
@@ -34,10 +34,10 @@ def test_are_you_trying(deployer, sett, strategy, want):
     assert want.balanceOf(strategy) < available
 
     # Use this if it should invest all
-    # assert want.balanceOf(strategy) == 0
+    assert want.balanceOf(strategy) == 0
 
-    # Change to this if the strat is supposed to hodl and do nothing
-    # assert strategy.balanceOf(want) = depositAmount
+
+    CvxStakingProxy.at(locker.cvxcrvStaking()).distribute()
 
     ## TEST 2: Is the Harvest profitable?
     harvest = strategy.harvest({"from": deployer})

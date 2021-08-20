@@ -71,12 +71,13 @@ def test_wait_for_all_locks_can_withdraw_easy(setup_strat, deployer, sett, strat
   assert want.balanceOf(deployer) > initial_dep ## Assert that we made some money
   ## If this passes, implicitly it means the lock was expire and we were able to withdraw
 
-def test_after_deposit_proxy_has_more_funds(locker, deployer, sett, strategy, want):
+def test_after_deposit_proxy_has_more_funds(locker, deployer, sett, strategy, want, staking):
   """
     We have to check that Strategy Proy
   """
   proxy = locker.stakingProxy()
-  initial_in_proxy = want.balanceOf(proxy)
+
+  initial_in_proxy = staking.balanceOf(proxy)
 
   # Setup
   startingBalance = want.balanceOf(deployer)
@@ -98,13 +99,13 @@ def test_after_deposit_proxy_has_more_funds(locker, deployer, sett, strategy, wa
   chain.sleep(10000 * 13)  # Mine so we get some interest
 
   ## TEST: Did the proxy get more want?
-  assert want.balanceOf(proxy) > initial_in_proxy
+  assert staking.balanceOf(proxy) > initial_in_proxy
 
 
 def test_delegation_was_correct(delegation_registry, strategy):
   target_delegate = strategy.DELEGATE()
-  hashed = keccak("cvx.eth")
-  status = delegation_registry.delegation(strategy, keccak("cvx.eth"))
+  hashed = keccak(text="cvx.eth").hex()
+  status = delegation_registry.delegation(strategy, hashed)
 
   print("hashed")
   print(hashed)
