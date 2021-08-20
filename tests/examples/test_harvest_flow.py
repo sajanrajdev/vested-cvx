@@ -31,7 +31,7 @@ def test_deposit_withdraw_single_user_flow(
 
     snap.settEarn({"from": settKeeper})
 
-    chain.sleep(15)
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine(1)
 
     snap.settWithdraw(shares // 2, {"from": deployer})
@@ -86,7 +86,7 @@ def test_single_user_harvest_flow(
 
     snap.settHarvest({"from": strategyKeeper})
 
-    chain.sleep(days(1))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     if tendable:
@@ -125,7 +125,7 @@ def test_migrate_single_user(
     chain.snapshot()
 
     # Test no harvests
-    chain.sleep(days(2))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     before = {"settWant": want.balanceOf(sett), "stratWant": strategy.balanceOf()}
@@ -172,7 +172,7 @@ def test_migrate_single_user(
     if strategy.isTendable():
         strategy.tend({"from": deployer})
 
-    chain.sleep(days(1))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     before = {
@@ -210,7 +210,7 @@ def test_withdraw_other(deployer, sett, controller, strategy, want):
     want.approve(sett, MaxUint256, {"from": deployer})
     sett.deposit(depositAmount, {"from": deployer})
 
-    chain.sleep(15)
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     sett.earn({"from": deployer})
@@ -223,7 +223,7 @@ def test_withdraw_other(deployer, sett, controller, strategy, want):
 
     strategy.harvest({"from": deployer})
 
-    chain.sleep(days(0.5))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     mockAmount = Wei("1000 ether")
@@ -269,13 +269,13 @@ def test_single_user_harvest_flow_remove_fees(
     # Earn
     snap.settEarn({"from": deployer})
 
-    chain.sleep(days(0.5))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     if tendable:
         snap.settTend({"from": deployer})
 
-    chain.sleep(days(1))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     with brownie.reverts("onlyAuthorizedActors"):
@@ -286,13 +286,13 @@ def test_single_user_harvest_flow_remove_fees(
     ## NOTE: Some strats do not do this, change accordingly
     assert want.balanceOf(controller.rewards()) > 0
 
-    chain.sleep(days(1))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     if tendable:
         snap.settTend({"from": deployer})
 
-    chain.sleep(days(3))
+    chain.sleep(86400 * 250) ## Wait 250 days so we can withdraw later
     chain.mine()
 
     snap.settHarvest({"from": deployer})
