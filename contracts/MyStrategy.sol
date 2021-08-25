@@ -10,6 +10,7 @@ import "../deps/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
 import "../interfaces/uniswap/IUniswapRouterV2.sol";
+import "../interfaces/badger/ISettV3.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
 import "../interfaces/snapshot/IDelegateRegistry.sol";
@@ -25,6 +26,7 @@ contract MyStrategy is BaseStrategy {
     address public lpComponent; // Token we provide liquidity with
     address public reward; // Token we farm and swap to want / lpComponent
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
 
     address public constant SUSHI_ROUTER =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
@@ -36,7 +38,14 @@ contract MyStrategy is BaseStrategy {
     address public constant DELEGATE =
         0xB65cef03b9B89f99517643226d76e286ee999e77;
 
+    bytes32 public constant DELEGATED_SPACE = "cvx.eth";
+
     ICvxLocker public LOCKER;
+
+    ISettV3 public CVX_VAULT =
+        ISettV3(0x53C8E199eb2Cb7c01543C137078a038937a68E40);
+
+    event Debug(string name, uint256 value);
 
     // Used to signal to the Badger Tree that rewards where sent to it
     event TreeDistribution(
@@ -73,18 +82,22 @@ contract MyStrategy is BaseStrategy {
         performanceFeeStrategist = _feeConfig[1];
         withdrawalFee = _feeConfig[2];
 
-        LOCKER = ICvxLocker(_locker);
+        LOCKER = ICvxLocker(_locker); //TODO: Make locker hardcoded at top of file
 
         /// @dev do one off approvals here
         // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
         // Permissions for Locker
-        IERC20Upgradeable(want).safeApprove(_locker, type(uint256).max);
+        IERC20Upgradeable(CVX).safeApprove(_locker, type(uint256).max);
+        IERC20Upgradeable(CVX).safeApprove(
+            address(CVX_VAULT),
+            type(uint256).max
+        );
 
         // Permissions for Sushiswap
         IERC20Upgradeable(reward).safeApprove(SUSHI_ROUTER, type(uint256).max);
 
         // Delegate voting to DELEGATE
-        SNAPSHOT.setDelegate(keccak256("cvx.eth"), DELEGATE);
+        SNAPSHOT.setDelegate(DELEGATED_SPACE, DELEGATE);
     }
 
     /// ===== View Functions =====
@@ -103,6 +116,8 @@ contract MyStrategy is BaseStrategy {
     function balanceOfPool() public view override returns (uint256) {
         // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
         return LOCKER.lockedBalanceOf(address(this));
+
+        // TODO: THIS HAS TO BE CHANGED IF WE USE bCVX
     }
 
     /// @dev Returns true if this strategy requires tending
@@ -148,8 +163,13 @@ contract MyStrategy is BaseStrategy {
     /// @notice When this function is called, the controller has already sent want to this
     /// @notice Just get the current balance and then invest accordingly
     function _deposit(uint256 _amount) internal override {
+        // We receive bCVX -> Convert to bCVX
+        CVX_VAULT.withdraw(_amount);
+
+        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+
         // Lock tokens for 16 weeks, send credit to strat, always use max boost cause why not?
-        LOCKER.lock(address(this), _amount, LOCKER.maximumBoostPayment());
+        LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
     }
 
     /// @dev utility function to withdraw everything for migration
@@ -163,6 +183,12 @@ contract MyStrategy is BaseStrategy {
 
         // Withdraw all we can
         LOCKER.processExpiredLocks(false);
+
+        // Redeposit all into bCVX
+        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+
+        // Redeposit into bCVX
+        CVX_VAULT.deposit(toDeposit);
     }
 
     /// @dev withdraw the specified amount of want, liquidate from lpComponent to want, paying off any necessary debt for the conversion
@@ -171,7 +197,17 @@ contract MyStrategy is BaseStrategy {
         override
         returns (uint256)
     {
-        // TODO: Revert if we have tons locked
+        // TODO: Convert _amount in bCVX to amount in CVX to unlock and deposit
+        uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
+        emit Debug("bCVXToCVX", bCVXToCVX);
+
+        require(bCVXToCVX > 10**18); // Avoid trying to redeem for less / loss of peg
+
+        uint256 _toWithdraw = _amount.mul(bCVXToCVX).div(10**18);
+
+        // NOTE / TODO: If we own some idle bCVX that is more than _toWithdraw we could
+        // just use that
+        emit Debug("_toWithdraw", _toWithdraw);
 
         // Withdrawable
         uint256 withdrawable =
@@ -179,21 +215,52 @@ contract MyStrategy is BaseStrategy {
                 LOCKER.balanceOf(address(this))
             );
 
+        emit Debug("withdrawable", withdrawable);
+
+        // Revert if we have tons locked
+        // NOTE: Will let it go through if locker.balanceOf is 0, meaning we have no locked funds
+        // NOTE: Rounding errors could make this a little sketch, we run down by 1
         require(
-            withdrawable >= _amount,
+            withdrawable >= _toWithdraw - 1 ||
+                LOCKER.balanceOf(address(this)) == 0,
             "Tokens are still locked, please wait"
         );
 
         // Withdraw all we can
         LOCKER.processExpiredLocks(false);
 
+        uint256 max = IERC20Upgradeable(CVX).balanceOf(address(this));
+        emit Debug("max", max);
+
+        CVX_VAULT.deposit(max); // May as well deposit all into bCVX which makes it more liquid?
+
+        //NOTE:
+        // Depositing into CVX Vault means we now have a CVX Vault balance which may not be used
+        // We could add a key in Harvest / Tend to toggle whether to relock or to just keep as bCVX
+
         //TODO: CHECK | We still may end up with less (I guess)
         uint256 avail = IERC20Upgradeable(want).balanceOf(address(this));
-        if (avail < _amount) {
+        emit Debug("avail", avail);
+
+        if (avail < _toWithdraw) {
             return avail;
         }
 
-        return _amount;
+        return _toWithdraw;
+    }
+
+    /// @dev manual function to reinvest
+    function reinvest() external whenNotPaused returns (uint256 reinvested) {
+        _onlyAuthorizedActors();
+
+        // Withdraw all we can
+        LOCKER.processExpiredLocks(false);
+
+        // Redeposit all into bCVX
+        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+
+        // Redeposit into bCVX
+        LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
     }
 
     /// @dev Harvest from strategy mechanics, realizing increase in underlying position
@@ -228,6 +295,7 @@ contract MyStrategy is BaseStrategy {
         revert(); // TODO: FIGURE OUT
     }
 
+    /// @dev Swap from reward to CVX, then deposit into bCVX vault
     function _swapcvxCRVToWant() internal {
         uint256 toSwap = IERC20Upgradeable(reward).balanceOf(address(this));
 
@@ -247,6 +315,12 @@ contract MyStrategy is BaseStrategy {
             address(this),
             now
         );
+
+        // Deposit into vault
+        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+        if (toDeposit > 0) {
+            CVX_VAULT.deposit(toDeposit);
+        }
     }
 
     /// ===== Internal Helper Functions =====

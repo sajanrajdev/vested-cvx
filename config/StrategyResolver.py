@@ -7,14 +7,12 @@ console = Console()
 class StrategyResolver(StrategyCoreResolver):
     def get_strategy_destinations(self):
         """
-            Track balances for all strategy implementations
-            (Strategy Must Implement)
+        Track balances for all strategy implementations
+        (Strategy Must Implement)
         """
         strategy = self.manager.strategy
 
-        return {
-            "locker": strategy.LOCKER()
-        }
+        return {"locker": strategy.LOCKER()}
 
     def hook_after_confirm_withdraw(self, before, after, params):
         """
@@ -76,5 +74,3 @@ class StrategyResolver(StrategyCoreResolver):
         """
         ## NOTE: Tend is not implemented for now
         assert False
-
-

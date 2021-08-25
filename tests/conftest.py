@@ -7,7 +7,7 @@ from brownie import (
     MyStrategy,
     CvxLocker,
     CvxStakingProxy,
-    Contract
+    Contract,
 )
 from brownie.network.account import Account
 from config import (
@@ -21,9 +21,11 @@ from config import (
 from dotmap import DotMap
 import pytest
 
+
 @pytest.fixture
 def deployer():
     return accounts[0]
+
 
 ## CVX Locker ##
 @pytest.fixture
@@ -45,9 +47,11 @@ def locker(deployer, cvxcrv):
 
     return locker
 
+
 @pytest.fixture
 def staking():
     return Contract.from_explorer("0xCF50b810E57Ac33B91dCF525C6ddd9881B139332")
+
 
 @pytest.fixture
 def deployed(locker):
@@ -97,7 +101,7 @@ def deployed(locker):
         guardian,
         PROTECTED_TOKENS,
         FEES,
-        locker ## NOTE: We have to do this only until CVX deploys to mainnet
+        locker,  ## NOTE: We have to do this only until CVX deploys to mainnet
     )
 
     ## Tool that verifies bytecode (run independently) <- Webapp for anyone to verify
@@ -113,20 +117,28 @@ def deployed(locker):
     controller.setStrategy(WANT, strategy, {"from": deployer})
 
     ## Send from a whale of CVX
-    whale = accounts.at("0x5F465e9fcfFc217c5849906216581a657cd60605", force=True)
-    want.transfer(a[0], 10000 * 10 **18, {"from": whale}) ## 10k CVX
+    whale = accounts.at("0x660802Fc641b154aBA66a62137e71f331B6d787A", force=True)
+    want.transfer(a[0], 10000 * 10 ** 18, {"from": whale})  ## 10k
+
+    ## NOTE: THIS HAS TO BE DONE IN SETUP JUST FOR THIS STRAT
+    ## Approve the Strat for bCVX
+    cvxVault = SettV3.at(want)
+    gov = accounts.at(sett.governance(), force=True)
+    cvxVault.approveContractAccess(strategy, {"from": gov})
 
     return DotMap(
         deployer=deployer,
         controller=controller,
         vault=sett,
         sett=sett,
+        cvxVault=cvxVault,
         strategy=strategy,
         # guestList=guestList,
         want=want,
         lpComponent=lpComponent,
         rewardToken=rewardToken,
     )
+
 
 @pytest.fixture
 def delegation_registry():
@@ -181,6 +193,3 @@ def settKeeper(vault):
 @pytest.fixture
 def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
-
-
-

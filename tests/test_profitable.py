@@ -37,7 +37,7 @@ def test_is_profitable(deployed):
 
     snap.settEarn({"from": settKeeper})
 
-    chain.sleep(86400 * 250) ## Wait 250 days
+    chain.sleep(86400 * 250)  ## Wait 250 days
     chain.mine(1)
 
     snap.settWithdrawAll({"from": deployer})
