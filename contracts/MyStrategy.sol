@@ -114,10 +114,11 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Balance of want currently held in strategy positions
     function balanceOfPool() public view override returns (uint256) {
-        // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
-        return LOCKER.lockedBalanceOf(address(this));
+        uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
 
-        // TODO: THIS HAS TO BE CHANGED IF WE USE bCVX
+        // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
+        // then multiply it by the price per share as we need to convert CVX to bCVX
+        return LOCKER.lockedBalanceOf(address(this)).mul(10**18).div(bCVXToCVX);
     }
 
     /// @dev Returns true if this strategy requires tending
@@ -168,8 +169,8 @@ contract MyStrategy is BaseStrategy {
 
         uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
 
-        // Lock tokens for 16 weeks, send credit to strat, always use max boost cause why not?
-        LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
+        // Lock tokens for 17 weeks, send credit to strat, always use max boost cause why not?
+        LOCKER.lock(address(this), toDeposit, 0);
     }
 
     /// @dev utility function to withdraw everything for migration
