@@ -2,7 +2,7 @@ import pytest
 import brownie
 from brownie import *
 from helpers.constants import MaxUint256
-
+from eth_utils import encode_hex
 """
   TODO: Put your tests here to prove the strat is good!
   See test_harvest_flow, for the basic tests
@@ -70,6 +70,7 @@ def test_after_deposit_proxy_has_more_funds(
 
 def test_delegation_was_correct(delegation_registry, strategy):
     target_delegate = strategy.DELEGATE()
-    status = delegation_registry.delegation(strategy, "cvx.eth")
+    SPACE_ID = "0x6376782e65746800000000000000000000000000000000000000000000000000"
+    status = delegation_registry.delegation(strategy, SPACE_ID)
 
     assert status == target_delegate

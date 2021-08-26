@@ -40,7 +40,8 @@ contract MyStrategy is BaseStrategy {
     address public constant DELEGATE =
         0xB65cef03b9B89f99517643226d76e286ee999e77;
 
-    bytes32 public constant DELEGATED_SPACE = "cvx.eth";
+    bytes32 public constant DELEGATED_SPACE =
+        0x6376782e65746800000000000000000000000000000000000000000000000000;
 
     ICvxLocker public LOCKER;
 

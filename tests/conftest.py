@@ -215,3 +215,8 @@ def setup_strat(deployer, sett, strategy, want):
 
     chain.sleep(10000 * 13)  # Mine so we get some interest
     return strategy
+
+## Forces reset before each test
+@pytest.fixture(autouse=True)
+def isolation(fn_isolation):
+    pass
