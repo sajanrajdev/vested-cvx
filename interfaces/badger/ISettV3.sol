@@ -9,4 +9,6 @@ interface ISettV3 {
     function withdraw(uint256 _amount) external;
 
     function getPricePerFullShare() external view returns (uint256);
+
+    function balanceOf(address) external view returns (uint256);
 }

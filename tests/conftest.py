@@ -1,14 +1,4 @@
-from brownie import (
-    accounts,
-    a,
-    interface,
-    Controller,
-    SettV3,
-    MyStrategy,
-    CvxLocker,
-    CvxStakingProxy,
-    Contract,
-)
+from brownie import *
 from brownie.network.account import Account
 from config import (
     BADGER_DEV_MULTISIG,
@@ -20,6 +10,8 @@ from config import (
 )
 from dotmap import DotMap
 import pytest
+from helpers.constants import MaxUint256
+
 
 
 @pytest.fixture
@@ -133,6 +125,8 @@ def deployed(locker):
         sett=sett,
         cvxVault=cvxVault,
         strategy=strategy,
+        governance=governance,
+        gov=gov,
         # guestList=guestList,
         want=want,
         lpComponent=lpComponent,
@@ -193,3 +187,31 @@ def settKeeper(vault):
 @pytest.fixture
 def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
+
+
+@pytest.fixture
+def setup_strat(deployer, sett, strategy, want):
+    """
+    Convenience fixture that depoists and harvests for us
+    """
+    # Setup
+    startingBalance = want.balanceOf(deployer)
+
+    depositAmount = startingBalance // 2
+    assert startingBalance >= depositAmount
+    assert startingBalance >= 0
+    # End Setup
+
+    # Deposit
+    assert want.balanceOf(sett) == 0
+
+    want.approve(sett, MaxUint256, {"from": deployer})
+    sett.deposit(depositAmount, {"from": deployer})
+
+    available = sett.available()
+    assert available > 0
+
+    sett.earn({"from": deployer})
+
+    chain.sleep(10000 * 13)  # Mine so we get some interest
+    return strategy
