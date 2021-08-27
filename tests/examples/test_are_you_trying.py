@@ -27,7 +27,6 @@ def test_are_you_trying(deployer, sett, strategy, want, locker):
 
     chain.sleep(86400 * 250)  ## Wait 250 days so we can withdraw later
 
-
     ## TEST 1: Does the want get used in any way?
     assert want.balanceOf(sett) == depositAmount - available
 

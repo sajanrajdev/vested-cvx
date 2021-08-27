@@ -169,7 +169,9 @@ contract MyStrategy is BaseStrategy {
         // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
         // then multiply it by the price per share as we need to convert CVX to bCVX
         uint256 valueInLocker =
-            CVXToWant(LOCKER.lockedBalanceOf(address(this)));
+            CVXToWant(LOCKER.lockedBalanceOf(address(this))).add(
+                CVXToWant(IERC20Upgradeable(CVX).balanceOf(address(this)))
+            );
 
         return (valueInLocker);
     }
@@ -186,10 +188,11 @@ contract MyStrategy is BaseStrategy {
         override
         returns (address[] memory)
     {
-        address[] memory protectedTokens = new address[](3);
+        address[] memory protectedTokens = new address[](4);
         protectedTokens[0] = want;
         protectedTokens[1] = lpComponent;
         protectedTokens[2] = reward;
+        protectedTokens[3] = CVX;
         return protectedTokens;
     }
 
@@ -260,10 +263,6 @@ contract MyStrategy is BaseStrategy {
         if (withdrawalSafetyCheck) {
             uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
             require(bCVXToCVX > 10**18, "Loss Of Peg"); // Avoid trying to redeem for less / loss of peg
-            emit Debug(
-                "_amount.mul(9_980).div(MAX_BPS)",
-                _amount.mul(9_980).div(MAX_BPS)
-            );
             require(
                 max >= _amount.mul(9_980).div(MAX_BPS),
                 "Withdrawal Safety Check"
@@ -314,11 +313,6 @@ contract MyStrategy is BaseStrategy {
     function tend() external whenNotPaused {
         _onlyAuthorizedActors();
         revert(); // NOTE: For now tend is replaced by manualRebalance
-    }
-
-    function processExpiredLocks() external whenNotPaused {
-        _onlyAuthorizedActors();
-        LOCKER.processExpiredLocks(false);
     }
 
     /// @dev Swap from reward to CVX, then deposit into bCVX vault
@@ -394,20 +388,11 @@ contract MyStrategy is BaseStrategy {
         );
     }
 
-    function depositCVXIntoVault() external whenNotPaused {
-        _onlyAuthorizedActors();
-
-        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
-        if (toDeposit > 0) {
-            CVX_VAULT.deposit(toDeposit);
-        }
-    }
-
     /// MANUAL FUNCTIONS ///
 
     /// @dev manual function to reinvest
     function reinvest() external whenNotPaused returns (uint256 reinvested) {
-        _onlyAuthorizedActors();
+        _onlyGovernanceOrStrategist();
 
         if (processLocksOnReinvest) {
             // Withdraw all we can
@@ -421,11 +406,34 @@ contract MyStrategy is BaseStrategy {
         LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
     }
 
+    function manualProcessExpiredLocks() external whenNotPaused {
+        _onlyGovernanceOrStrategist();
+        LOCKER.processExpiredLocks(false);
+        // Unlock veCVX that is expired and redeem CVX back to this strat
+        // Processed in the next harvest or during prepareMigrateAll
+    }
+
+    function manualDepositCVXIntoVault() external whenNotPaused {
+        _onlyGovernanceOrStrategist();
+
+        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+        if (toDeposit > 0) {
+            CVX_VAULT.deposit(toDeposit);
+        }
+    }
+
+    function manualSendbCVXToVault() external whenNotPaused {
+        _onlyGovernanceOrStrategist();
+        uint256 cvxAmount = IERC20Upgradeable(CVX).balanceOf(address(this));
+        _transferToVault(cvxAmount);
+    }
+
     function manualRebalance(uint256 toLock) external whenNotPaused {
-        _onlyGovernance();
+        _onlyGovernanceOrStrategist();
         require(toLock <= MAX_BPS, "Max is 100%");
 
         if (processLocksOnRebalance) {
+            // manualRebalance will revert if you have no expired locks
             LOCKER.processExpiredLocks(false);
         }
 
@@ -483,11 +491,5 @@ contract MyStrategy is BaseStrategy {
             CVX_VAULT.deposit(cvxLeft);
         }
         // At the end of the rebalance, there won't be any balanceOfCVX as that token is not considered by our strat
-    }
-
-    function manualSendbCVXToVault() external whenNotPaused {
-        _onlyGovernance();
-        uint256 cvxAmount = IERC20Upgradeable(CVX).balanceOf(address(this));
-        _transferToVault(cvxAmount);
     }
 }

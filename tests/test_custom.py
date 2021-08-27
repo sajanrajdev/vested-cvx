@@ -3,6 +3,7 @@ import brownie
 from brownie import *
 from helpers.constants import MaxUint256
 from eth_utils import encode_hex
+
 """
   TODO: Put your tests here to prove the strat is good!
   See test_harvest_flow, for the basic tests
@@ -24,13 +25,12 @@ def test_if_change_min_some_can_be_withdraw_easy(setup_strat, sett, deployer, wa
     ## TODO / CHECK This is the ideal math but it seems to revert on me
     ## min = (sett.max() - sett.min() - 1) * sett.balanceOf(deployer) / 10000
     min = (sett.max() - sett.min() - 1) * sett.balanceOf(deployer) / 10000
-    
+
     sett.withdraw(min, {"from": deployer})
 
     assert (
         want.balanceOf(deployer) > initial_b
     )  ## You can withdraw as long as it's less than min
-
 
 
 def test_after_deposit_proxy_has_more_funds(

@@ -45,7 +45,15 @@ def test_deposit_withdraw_single_user_flow(
 
 
 def test_single_user_harvest_flow(
-    deployer, vault, sett, controller, strategy, want, settKeeper, strategyKeeper, deployed
+    deployer,
+    vault,
+    sett,
+    controller,
+    strategy,
+    want,
+    settKeeper,
+    strategyKeeper,
+    deployed,
 ):
     # Setup
     snap = SnapshotManager(vault, strategy, controller, "StrategySnapshot")

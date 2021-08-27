@@ -3,6 +3,7 @@ import brownie
 from brownie import *
 from helpers.constants import MaxUint256
 
+
 def test_wait_for_all_locks_can_withdraw_easy_after_manual_rebalance(
     setup_strat, deployer, sett, strategy, want, locker, deployed
 ):
@@ -19,6 +20,8 @@ def test_wait_for_all_locks_can_withdraw_easy_after_manual_rebalance(
     ## Try to withdraw all
     sett.withdraw(initial_dep, {"from": deployer})
 
-    assert want.balanceOf(deployer) * 0.998 > initial_dep  ## Assert that we have not lost more than 10 basis points
+    assert (
+        want.balanceOf(deployer) * 0.998 > initial_dep
+    )  ## Assert that we have not lost more than 10 basis points
     ## If this passes, implicitly it means the lock was expire and we were able to withdraw
     ## NOTE: We have to call strategy.manualRebalance with an amount that unlocks enough funds or we won't be able to withdraw
