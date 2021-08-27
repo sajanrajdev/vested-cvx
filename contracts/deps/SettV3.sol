@@ -274,6 +274,15 @@ contract SettV3 is
         IController(controller).earn(address(token), _bal);
     }
 
+    /// @notice Transfer the specified amount
+    /// @notice used so you can specify how many tokens to lock
+    function earn(uint256 amount) public whenNotPaused {
+        _onlyAuthorizedActors();
+
+        token.safeTransfer(controller, amount);
+        IController(controller).earn(address(token), amount);
+    }
+
     /// @dev Emit event tracking current full price per share
     /// @dev Provides a pure on-chain way of approximating APY
     function trackFullPricePerShare() external whenNotPaused {
