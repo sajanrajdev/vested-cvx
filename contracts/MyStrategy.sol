@@ -149,22 +149,24 @@ contract MyStrategy is BaseStrategy {
         return "1.0";
     }
 
-    // From CVX Token to Helper Vault Token
+    /// @dev From CVX Token to Helper Vault Token
     function CVXToWant(uint256 cvx) public view returns (uint256) {
         uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare();
         return cvx.mul(10**18).div(bCVXToCVX);
     }
 
-    // From Helper Vault Token to CVX Token
+    /// @dev From Helper Vault Token to CVX Token
     function wantToCVX(uint256 want) public view returns (uint256) {
         uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare();
-
         return want.mul(bCVXToCVX).div(10**18);
     }
 
     /// @dev Balance of want currently held in strategy positions
     function balanceOfPool() public view override returns (uint256) {
-        uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
+        if (withdrawalSafetyCheck) {
+            uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
+            require(bCVXToCVX > 10**18, "Loss Of Peg"); // Avoid trying to redeem for less / loss of peg
+        }
 
         // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
         // then multiply it by the price per share as we need to convert CVX to bCVX
@@ -230,12 +232,16 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// @dev utility function to convert all we can to bCVX
+    /// @notice You may want to harvest before calling this to maximize the amount of bCVX you'll have
     function prepareWithdrawAll() external {
         _onlyGovernance();
 
         LOCKER.processExpiredLocks(false);
 
-        harvest(); // NOTE: Harvest will also deposit all into bCVX
+        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+        if (toDeposit > 0) {
+            CVX_VAULT.deposit(toDeposit);
+        }
     }
 
     /// @dev utility function to withdraw everything for migration
@@ -390,7 +396,7 @@ contract MyStrategy is BaseStrategy {
 
     /// MANUAL FUNCTIONS ///
 
-    /// @dev manual function to reinvest
+    /// @dev manual function to reinvest all CVX that was locked
     function reinvest() external whenNotPaused returns (uint256 reinvested) {
         _onlyGovernanceOrStrategist();
 
@@ -406,6 +412,7 @@ contract MyStrategy is BaseStrategy {
         LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
     }
 
+    /// @dev process all locks, to redeem
     function manualProcessExpiredLocks() external whenNotPaused {
         _onlyGovernanceOrStrategist();
         LOCKER.processExpiredLocks(false);
@@ -413,6 +420,7 @@ contract MyStrategy is BaseStrategy {
         // Processed in the next harvest or during prepareMigrateAll
     }
 
+    /// @dev Take all CVX and deposits in the CVX_VAULT
     function manualDepositCVXIntoVault() external whenNotPaused {
         _onlyGovernanceOrStrategist();
 
@@ -422,12 +430,17 @@ contract MyStrategy is BaseStrategy {
         }
     }
 
+    /// @dev Send all available bCVX to the Vault
+    /// @notice you can do this so you can earn again (re-lock), or just to add to the redemption pool
     function manualSendbCVXToVault() external whenNotPaused {
         _onlyGovernanceOrStrategist();
         uint256 cvxAmount = IERC20Upgradeable(CVX).balanceOf(address(this));
         _transferToVault(cvxAmount);
     }
 
+    /// @dev use the currently available CVX to either lock or add to bCVX
+    /// @notice toLock = 0, lock nothing, deposit in bCVX as much as you can
+    /// @notice toLock = 100, lock everything (CVX) you have
     function manualRebalance(uint256 toLock) external whenNotPaused {
         _onlyGovernanceOrStrategist();
         require(toLock <= MAX_BPS, "Max is 100%");
