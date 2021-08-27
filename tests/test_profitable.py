@@ -40,6 +40,8 @@ def test_is_profitable(deployed):
     chain.sleep(86400 * 250)  ## Wait 250 days
     chain.mine(1)
 
+    strategy.manualRebalance(0, {"from": deployed.governance})
+
     snap.settWithdrawAll({"from": deployer})
 
     ending_balance = want.balanceOf(deployer)

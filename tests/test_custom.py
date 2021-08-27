@@ -25,9 +25,7 @@ def test_if_change_min_some_can_be_withdraw_easy(setup_strat, sett, deployer, wa
     ## min = (sett.max() - sett.min() - 1) * sett.balanceOf(deployer) / 10000
     min = (sett.max() - sett.min() - 1) * sett.balanceOf(deployer) / 10000
     
-
-    ## TODO: FIX TO * 1 before sending to prod, else it's a sign accounting is wrong
-    sett.withdraw(min * 0.70, {"from": deployer})
+    sett.withdraw(min, {"from": deployer})
 
     assert (
         want.balanceOf(deployer) > initial_b

@@ -6,7 +6,7 @@ from helpers.time import days
 
 
 def test_deposit_withdraw_single_user_flow(
-    deployer, vault, controller, strategy, want, settKeeper
+    deployer, vault, controller, strategy, want, settKeeper, deployed
 ):
     # Setup
     snap = SnapshotManager(vault, strategy, controller, "StrategySnapshot")
@@ -34,6 +34,8 @@ def test_deposit_withdraw_single_user_flow(
     chain.sleep(86400 * 250)  ## Wait 250 days so we can withdraw later
     chain.mine(1)
 
+    strategy.manualRebalance(0, {"from": deployed.governance})
+
     snap.settWithdraw(shares // 2, {"from": deployer})
 
     chain.sleep(10000)
@@ -43,7 +45,7 @@ def test_deposit_withdraw_single_user_flow(
 
 
 def test_single_user_harvest_flow(
-    deployer, vault, sett, controller, strategy, want, settKeeper, strategyKeeper
+    deployer, vault, sett, controller, strategy, want, settKeeper, strategyKeeper, deployed
 ):
     # Setup
     snap = SnapshotManager(vault, strategy, controller, "StrategySnapshot")
@@ -92,6 +94,8 @@ def test_single_user_harvest_flow(
     if tendable:
         snap.settTend({"from": strategyKeeper})
 
+    strategy.manualRebalance(0, {"from": deployed.governance})
+
     snap.settWithdraw(shares // 2, {"from": deployer})
 
     chain.sleep(days(3))
@@ -102,7 +106,7 @@ def test_single_user_harvest_flow(
 
 
 def test_migrate_single_user(
-    deployer, vault, sett, controller, strategy, want, strategist
+    deployer, vault, sett, controller, strategy, want, strategist, deployed
 ):
     # Setup
     randomUser = accounts[6]
@@ -133,11 +137,12 @@ def test_migrate_single_user(
     with brownie.reverts():
         controller.withdrawAll(strategy.want(), {"from": randomUser})
 
+    strategy.prepareWithdrawAll({"from": deployed.governance})
     controller.withdrawAll(strategy.want(), {"from": deployer})
 
     after = {"settWant": want.balanceOf(sett), "stratWant": strategy.balanceOf()}
 
-    assert after["settWant"] > before["settWant"]
+    assert after["settWant"] >= before["settWant"]
     assert after["stratWant"] < before["stratWant"]
     assert after["stratWant"] == 0
 
@@ -155,11 +160,12 @@ def test_migrate_single_user(
         with brownie.reverts():
             controller.withdrawAll(strategy.want(), {"from": randomUser})
 
+        strategy.prepareWithdrawAll({"from": deployed.governance})
         controller.withdrawAll(strategy.want(), {"from": deployer})
 
         after = {"settWant": want.balanceOf(sett), "stratWant": strategy.balanceOf()}
 
-        assert after["settWant"] > before["settWant"]
+        assert after["settWant"] >= before["settWant"]
         assert after["stratWant"] < before["stratWant"]
         assert after["stratWant"] == 0
 
@@ -184,11 +190,12 @@ def test_migrate_single_user(
     with brownie.reverts():
         controller.withdrawAll(strategy.want(), {"from": randomUser})
 
+    strategy.prepareWithdrawAll({"from": deployed.governance})
     controller.withdrawAll(strategy.want(), {"from": deployer})
 
     after = {"settWant": want.balanceOf(sett), "stratWant": strategy.balanceOf()}
 
-    assert after["settWant"] > before["settWant"]
+    assert after["settWant"] >= before["settWant"]
     assert after["stratWant"] < before["stratWant"]
     assert after["stratWant"] == 0
 
@@ -250,7 +257,7 @@ def test_withdraw_other(deployer, sett, controller, strategy, want):
 
 
 def test_single_user_harvest_flow_remove_fees(
-    deployer, vault, sett, controller, strategy, want
+    deployer, vault, sett, controller, strategy, want, deployed
 ):
     # Setup
     randomUser = accounts[6]
@@ -295,6 +302,7 @@ def test_single_user_harvest_flow_remove_fees(
     chain.sleep(86400 * 250)  ## Wait 250 days so we can withdraw later
     chain.mine()
 
+    strategy.prepareWithdrawAll({"from": deployed.governance})
     snap.settHarvest({"from": deployer})
 
     snap.settWithdrawAll({"from": deployer})

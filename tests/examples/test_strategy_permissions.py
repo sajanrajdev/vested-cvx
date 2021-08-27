@@ -201,14 +201,6 @@ def test_strategy_pausing_permissions(deployer, sett, controller, strategy, want
 
     strategy.unpause({"from": authorizedUnpausers[0]})
 
-    sett.deposit(1, {"from": deployer})
-    sett.withdraw(1, {"from": deployer})
-    sett.withdrawAll({"from": deployer})
-
-    strategy.harvest({"from": strategyKeeper})
-    if strategy.isTendable():
-        strategy.tend({"from": strategyKeeper})
-
 
 def test_sett_pausing_permissions(deployer, sett, controller, strategy, want):
     # Setup
@@ -260,10 +252,7 @@ def test_sett_pausing_permissions(deployer, sett, controller, strategy, want):
 
     sett.unpause({"from": authorizedUnpausers[0]})
 
-    sett.deposit(1, {"from": deployer})
-    sett.earn({"from": settKeeper})
-    sett.withdraw(1, {"from": deployer})
-    sett.withdrawAll({"from": deployer})
+    ## NOTE: Delete unpause checks as we test them elsewhere
 
 
 def test_sett_config_permissions(deployer, sett, controller, strategy, want):
