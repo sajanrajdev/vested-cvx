@@ -398,7 +398,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev manual function to reinvest all CVX that was locked
     function reinvest() external whenNotPaused returns (uint256 reinvested) {
-        _onlyGovernanceOrStrategist();
+        _onlyGovernance();
 
         if (processLocksOnReinvest) {
             // Withdraw all we can
@@ -414,7 +414,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev process all locks, to redeem
     function manualProcessExpiredLocks() external whenNotPaused {
-        _onlyGovernanceOrStrategist();
+        _onlyGovernance();
         LOCKER.processExpiredLocks(false);
         // Unlock veCVX that is expired and redeem CVX back to this strat
         // Processed in the next harvest or during prepareMigrateAll
@@ -422,7 +422,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Take all CVX and deposits in the CVX_VAULT
     function manualDepositCVXIntoVault() external whenNotPaused {
-        _onlyGovernanceOrStrategist();
+        _onlyGovernance();
 
         uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
         if (toDeposit > 0) {
@@ -433,7 +433,7 @@ contract MyStrategy is BaseStrategy {
     /// @dev Send all available bCVX to the Vault
     /// @notice you can do this so you can earn again (re-lock), or just to add to the redemption pool
     function manualSendbCVXToVault() external whenNotPaused {
-        _onlyGovernanceOrStrategist();
+        _onlyGovernance();
         uint256 cvxAmount = IERC20Upgradeable(CVX).balanceOf(address(this));
         _transferToVault(cvxAmount);
     }
@@ -442,7 +442,7 @@ contract MyStrategy is BaseStrategy {
     /// @notice toLock = 0, lock nothing, deposit in bCVX as much as you can
     /// @notice toLock = 100, lock everything (CVX) you have
     function manualRebalance(uint256 toLock) external whenNotPaused {
-        _onlyGovernanceOrStrategist();
+        _onlyGovernance();
         require(toLock <= MAX_BPS, "Max is 100%");
 
         if (processLocksOnRebalance) {
@@ -489,6 +489,7 @@ contract MyStrategy is BaseStrategy {
 
         // NOTE: We only lock the CVX we have and not the bCVX
         // bCVX should be sent back to vault and then go through earn
+        // We do this because bCVX has "blockLock" and we can't both deposit and withdraw on the same block
         uint256 maxCVX = IERC20Upgradeable(CVX).balanceOf(address(this));
         if (cvxToLock > maxCVX) {
             // Just lock what we can

@@ -174,6 +174,10 @@ def tokens():
 
 ## Accounts ##
 @pytest.fixture
+def governance(deployed):
+    return accounts.at(deployed.governance, force=True)
+
+@pytest.fixture
 def strategist(strategy):
     return accounts.at(strategy.strategist(), force=True)
 
