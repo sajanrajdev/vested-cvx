@@ -434,8 +434,8 @@ contract MyStrategy is BaseStrategy {
     /// @notice you can do this so you can earn again (re-lock), or just to add to the redemption pool
     function manualSendbCVXToVault() external whenNotPaused {
         _onlyGovernance();
-        uint256 cvxAmount = IERC20Upgradeable(CVX).balanceOf(address(this));
-        _transferToVault(cvxAmount);
+        uint256 bCvxAmount = IERC20Upgradeable(want).balanceOf(address(this));
+        _transferToVault(bCvxAmount);
     }
 
     /// @dev use the currently available CVX to either lock or add to bCVX
