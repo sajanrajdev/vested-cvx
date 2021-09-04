@@ -222,7 +222,7 @@ contract MyStrategy is BaseStrategy {
     /// @notice When this function is called, the controller has already sent want to this
     /// @notice Just get the current balance and then invest accordingly
     function _deposit(uint256 _amount) internal override {
-        // We receive bCVX -> Convert to bCVX
+        // We receive bCVX -> Convert to CVX
         CVX_VAULT.withdraw(_amount);
 
         uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
