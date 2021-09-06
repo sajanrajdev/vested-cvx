@@ -21,7 +21,10 @@ def test_is_profitable(deployed):
 
     snap = SnapshotManager(vault, strategy, controller, "StrategySnapshot")
 
-    # Deposit
+    reward = interface.IERC20(strategy.reward())
+    reward_before = reward.balanceOf(strategy.strategist())
+
+    # Deposit   
     assert want.balanceOf(deployer) > 0
 
     depositAmount = int(want.balanceOf(deployer) * 0.8)
@@ -56,5 +59,10 @@ def test_is_profitable(deployed):
     print(initial_balance_with_fees)
     print("Ending Balance")
     print(ending_balance)
+
+    reward_after = reward.balanceOf(strategy.strategist())
+
+    ## Custom check for rewards being sent to gov as resolver is too complex
+    assert reward_after > reward_before
 
     assert ending_balance > initial_balance_with_fees

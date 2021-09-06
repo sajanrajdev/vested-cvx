@@ -152,7 +152,7 @@ def locker(strategy):
 
 @pytest.fixture
 def staking(locker):
-    return CvxStakingProxy.at(locker.stakingProxy());
+    return CvxStakingProxy.at(locker.stakingProxy())
 
 
 ## Tokens ##

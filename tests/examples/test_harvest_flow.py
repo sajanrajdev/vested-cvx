@@ -102,14 +102,15 @@ def test_single_user_harvest_flow(
     if tendable:
         snap.settTend({"from": strategyKeeper})
 
-    strategy.manualRebalance(0, {"from": deployed.governance})
+    strategy.manualRebalance(0, {"from": deployed.governance}) 
+    ## Any harvest after here will not produce any rewards
+    ## We have unlocked everything
 
     snap.settWithdraw(shares // 2, {"from": deployer})
 
     chain.sleep(days(3))
     chain.mine()
 
-    snap.settHarvest({"from": strategyKeeper})
     snap.settWithdraw(shares // 2 - 1, {"from": deployer})
 
 

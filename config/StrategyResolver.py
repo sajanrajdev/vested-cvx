@@ -1,3 +1,4 @@
+from brownie import *
 from helpers.StrategyCoreResolver import StrategyCoreResolver
 from rich.console import Console
 
@@ -48,21 +49,13 @@ class StrategyResolver(StrategyCoreResolver):
         self.manager.printCompare(before, after)
         self.confirm_harvest_state(before, after, tx)
 
-        valueGained = after.get("sett.pricePerFullShare") > before.get(
+        assert after.get("sett.pricePerFullShare") > before.get(
             "sett.pricePerFullShare"
         )
 
-        # # Strategist should earn if fee is enabled and value was generated
-        if before.get("strategy.performanceFeeStrategist") > 0 and valueGained:
-            assert after.balances("want", "strategist") > before.balances(
-                "want", "strategist"
-            )
-
-        # # Strategist should earn if fee is enabled and value was generated
-        if before.get("strategy.performanceFeeGovernance") > 0 and valueGained:
-            assert after.balances("want", "governanceRewards") > before.balances(
-                "want", "governanceRewards"
-            )
+        ## NOTE: Since we need to check the increment of a token that is not want, 
+        # we have a custom test for this
+        assert True
 
     def confirm_tend(self, before, after, tx):
         """
