@@ -38,16 +38,16 @@ contract MyStrategy is BaseStrategy {
 
     // The address this strategies delegates voting to
     address public constant DELEGATE =
-        0xB65cef03b9B89f99517643226d76e286ee999e77;
+        0xF8dbb94608E72A3C4cEeAB4ad495ac51210a341e;
 
     bytes32 public constant DELEGATED_SPACE =
         0x6376782e65746800000000000000000000000000000000000000000000000000;
 
-    ISettV3 public CVX_VAULT =
+    ISettV3 public constant CVX_VAULT =
         ISettV3(0x53C8E199eb2Cb7c01543C137078a038937a68E40);
 
     // NOTE: At time of publishing, this contract is under audit
-    ICvxLocker public LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
+    ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
 
     bool public withdrawalSafetyCheck = true;
     bool public harvestOnRebalance = true;
@@ -110,6 +110,13 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// ===== Extra Functions =====
+    /// @dev Change Delegation to another address
+    function manualSetDelegate(address delegate) {
+        _onlyGovernance();
+        // Set delegate is enough as it will clear previous delegate automatically
+        SNAPSHOT.setDelegate(DELEGATED_SPACE, delegate);
+    }
+
     ///@dev Should we check if the amount requested is more than what we can return on withdrawal?
     function setWithdrawalSafetyCheck(bool newWithdrawalSafetyCheck) public {
         _onlyGovernance();
