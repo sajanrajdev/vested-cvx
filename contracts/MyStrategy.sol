@@ -99,7 +99,10 @@ contract MyStrategy is BaseStrategy {
         
 
         /// @dev do one off approvals here
-        // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
+        // Sushi to swap CRV -> CVX
+        IERC20Upgradeable(CRV).safeApprove(SUSHI_ROUTER, type(uint256).max);
+        // Curve to swap cvxCRV -> CRV
+        IERC20Upgradeable(reward).safeApprove(address(CURVE_POOL), type(uint256).max);
         // Permissions for Locker
         IERC20Upgradeable(CVX).safeApprove(address(LOCKER), type(uint256).max);
         IERC20Upgradeable(CVX).safeApprove(
@@ -107,8 +110,7 @@ contract MyStrategy is BaseStrategy {
             type(uint256).max
         );
 
-        // Permissions for Sushiswap
-        IERC20Upgradeable(reward).safeApprove(SUSHI_ROUTER, type(uint256).max);
+
 
         // Delegate voting to DELEGATE
         SNAPSHOT.setDelegate(DELEGATED_SPACE, DELEGATE);

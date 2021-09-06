@@ -33,15 +33,14 @@ def test_if_change_min_some_can_be_withdraw_easy(setup_strat, sett, deployer, wa
     )  ## You can withdraw as long as it's less than min
 
 
-def test_after_deposit_proxy_has_more_funds(
+def test_after_deposit_locker_has_more_funds(
     locker, deployer, sett, strategy, want, staking
 ):
     """
-    We have to check that Strategy Proy
+    We have to check that the Locker get's more funds after a deposit
     """
-    proxy = locker.stakingProxy()
 
-    initial_in_proxy = staking.balanceOf(proxy)
+    intitial_in_locker = locker.lockedBalanceOf(strategy) + locker.balanceOf(strategy)
 
     # Setup
     startingBalance = want.balanceOf(deployer)
@@ -63,7 +62,7 @@ def test_after_deposit_proxy_has_more_funds(
     chain.sleep(10000 * 13)  # Mine so we get some interest
 
     ## TEST: Did the proxy get more want?
-    assert staking.balanceOf(proxy) > initial_in_proxy
+    assert locker.lockedBalanceOf(strategy) + locker.balanceOf(strategy) > intitial_in_locker
 
 
 def test_delegation_was_correct(delegation_registry, strategy):

@@ -24,28 +24,11 @@ def cvxcrv():
     return "0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7"
 
 
-@pytest.fixture
-def locker(deployer, cvxcrv):
-    ## From https://github.com/convex-eth/platform/blob/5f6682012a6d983af3500abfb49a1bce5f6c5837/contracts/test/24_LockTests.js#L83-L89
 
-    locker = CvxLocker.deploy({"from": deployer})
-    stakeproxy = CvxStakingProxy.deploy(locker, {"from": deployer})
-    stakeproxy.setApprovals()
-
-    locker.addReward(cvxcrv, stakeproxy, False, {"from": deployer})
-    locker.setStakingContract(stakeproxy, {"from": deployer})
-    locker.setApprovals()
-
-    return locker
 
 
 @pytest.fixture
-def staking():
-    return Contract.from_explorer("0xCF50b810E57Ac33B91dCF525C6ddd9881B139332")
-
-
-@pytest.fixture
-def deployed(locker):
+def deployed():
     """
     Deploys, vault, controller and strats and wires them up for you to test
     """
@@ -132,6 +115,7 @@ def deployed(locker):
     )
 
 
+
 @pytest.fixture
 def delegation_registry():
     return Contract.from_explorer("0x469788fE6E9E9681C6ebF3bF78e7Fd26Fc015446")
@@ -156,6 +140,19 @@ def controller(deployed):
 @pytest.fixture
 def strategy(deployed):
     return deployed.strategy
+
+
+## CVX
+@pytest.fixture
+def locker(strategy):
+    locker = CvxLocker.at(strategy.LOCKER())
+
+    return locker
+
+
+@pytest.fixture
+def staking(locker):
+    return CvxStakingProxy.at(locker.stakingProxy());
 
 
 ## Tokens ##
@@ -192,6 +189,8 @@ def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
 
 
+
+
 @pytest.fixture
 def setup_strat(deployer, sett, strategy, want):
     """
@@ -224,3 +223,5 @@ def setup_strat(deployer, sett, strategy, want):
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
+
+
