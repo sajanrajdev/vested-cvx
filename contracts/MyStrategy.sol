@@ -440,7 +440,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev use the currently available CVX to either lock or add to bCVX
     /// @notice toLock = 0, lock nothing, deposit in bCVX as much as you can
-    /// @notice toLock = 100, lock everything (CVX) you have
+    /// @notice toLock = 10_000, lock everything (CVX) you have
     function manualRebalance(uint256 toLock) external whenNotPaused {
         _onlyGovernance();
         require(toLock <= MAX_BPS, "Max is 100%");
