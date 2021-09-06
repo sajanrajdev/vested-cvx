@@ -310,16 +310,8 @@ def test_single_user_harvest_flow_remove_fees(
 
     chain.sleep(86400 * 250)  ## Wait 250 days so we can withdraw later
     chain.mine()
-
     strategy.prepareWithdrawAll({"from": deployed.governance})
-    snap.settHarvest({"from": deployer})
 
     snap.settWithdrawAll({"from": deployer})
 
     endingBalance = want.balanceOf(deployer)
-
-    print("Report after 4 days")
-    print("Gains")
-    print(endingBalance - startingBalance)
-    print("gainsPercentage")
-    print((endingBalance - startingBalance) / startingBalance)
