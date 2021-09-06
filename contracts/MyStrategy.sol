@@ -43,8 +43,6 @@ contract MyStrategy is BaseStrategy {
     bytes32 public constant DELEGATED_SPACE =
         0x6376782e65746800000000000000000000000000000000000000000000000000;
 
-    ICvxLocker public LOCKER;
-
     ISettV3 public CVX_VAULT =
         ISettV3(0x53C8E199eb2Cb7c01543C137078a038937a68E40);
 
@@ -74,7 +72,7 @@ contract MyStrategy is BaseStrategy {
         address _keeper,
         address _guardian,
         address[3] memory _wantConfig,
-        uint256[3] memory _feeConfig,
+        uint256[3] memory _feeConfig
     ) public initializer {
         __BaseStrategy_init(
             _governance,
@@ -98,7 +96,7 @@ contract MyStrategy is BaseStrategy {
         /// @dev do one off approvals here
         // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
         // Permissions for Locker
-        IERC20Upgradeable(CVX).safeApprove(_locker, type(uint256).max);
+        IERC20Upgradeable(CVX).safeApprove(address(LOCKER), type(uint256).max);
         IERC20Upgradeable(CVX).safeApprove(
             address(CVX_VAULT),
             type(uint256).max
