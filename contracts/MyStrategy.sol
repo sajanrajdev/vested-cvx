@@ -227,7 +227,7 @@ contract MyStrategy is BaseStrategy {
 
         uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
 
-        // Lock tokens for 17 weeks, send credit to strat, always use max boost cause why not?
+        // Lock tokens for 16 weeks, send credit to strat, always use max boost cause why not?
         LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
     }
 
