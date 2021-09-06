@@ -92,7 +92,6 @@ def deployed(locker):
         guardian,
         PROTECTED_TOKENS,
         FEES,
-        locker,  ## NOTE: We have to do this only until CVX deploys to mainnet
     )
 
     ## Tool that verifies bytecode (run independently) <- Webapp for anyone to verify

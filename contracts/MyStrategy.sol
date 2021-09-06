@@ -48,6 +48,9 @@ contract MyStrategy is BaseStrategy {
     ISettV3 public CVX_VAULT =
         ISettV3(0x53C8E199eb2Cb7c01543C137078a038937a68E40);
 
+    // NOTE: At time of publishing, this contract is under audit
+    ICvxLocker public LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
+
     bool public withdrawalSafetyCheck = true;
     bool public harvestOnRebalance = true;
     // If nothing is unlocked, processExpiredLocks will revert
@@ -72,7 +75,6 @@ contract MyStrategy is BaseStrategy {
         address _guardian,
         address[3] memory _wantConfig,
         uint256[3] memory _feeConfig,
-        address _locker ///@dev TODO: Add this to deploy
     ) public initializer {
         __BaseStrategy_init(
             _governance,
@@ -91,7 +93,7 @@ contract MyStrategy is BaseStrategy {
         performanceFeeStrategist = _feeConfig[1];
         withdrawalFee = _feeConfig[2];
 
-        LOCKER = ICvxLocker(_locker); //TODO: Make locker hardcoded at top of file
+        
 
         /// @dev do one off approvals here
         // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
