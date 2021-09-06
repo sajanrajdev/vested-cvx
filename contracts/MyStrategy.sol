@@ -14,6 +14,7 @@ import "../interfaces/badger/ISettV3.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
 import "../interfaces/snapshot/IDelegateRegistry.sol";
+import "../interfaces/curve/ICurvePool.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
@@ -29,6 +30,7 @@ contract MyStrategy is BaseStrategy {
     address public reward; // Token we farm and swap to want / lpComponent
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
+    address public constant CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
 
     address public constant SUSHI_ROUTER =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
@@ -36,9 +38,9 @@ contract MyStrategy is BaseStrategy {
     IDelegateRegistry public constant SNAPSHOT =
         IDelegateRegistry(0x469788fE6E9E9681C6ebF3bF78e7Fd26Fc015446);
 
-    // The address this strategies delegates voting to
+    // The initial DELEGATE for the strategy // NOTE we can change it by using manualSetDelegate below
     address public constant DELEGATE =
-        0xF8dbb94608E72A3C4cEeAB4ad495ac51210a341e;
+        0x14F83fF95D4Ec5E8812DDf42DA1232b0ba1015e6;
 
     bytes32 public constant DELEGATED_SPACE =
         0x6376782e65746800000000000000000000000000000000000000000000000000;
@@ -48,6 +50,9 @@ contract MyStrategy is BaseStrategy {
 
     // NOTE: At time of publishing, this contract is under audit
     ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
+
+    // Curve Pool to swap between cvxCRV and CRV
+    ICurvePool public constant CURVE_POOL = ICurvePool(0x9D0464996170c6B9e75eED71c68B99dDEDf279e8);
 
     bool public withdrawalSafetyCheck = true;
     bool public harvestOnRebalance = true;
@@ -111,7 +116,7 @@ contract MyStrategy is BaseStrategy {
 
     /// ===== Extra Functions =====
     /// @dev Change Delegation to another address
-    function manualSetDelegate(address delegate) {
+    function manualSetDelegate(address delegate) public {
         _onlyGovernance();
         // Set delegate is enough as it will clear previous delegate automatically
         SNAPSHOT.setDelegate(DELEGATED_SPACE, delegate);
@@ -330,15 +335,27 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Swap from reward to CVX, then deposit into bCVX vault
     function _swapcvxCRVToWant() internal {
-        uint256 toSwap = IERC20Upgradeable(reward).balanceOf(address(this));
-
-        if (toSwap == 0) {
+        uint256 cvxCRVToSwap = IERC20Upgradeable(reward).balanceOf(address(this));
+        if (cvxCRVToSwap == 0) {
             return;
         }
 
+        // From cvxCRV to CRV
+        CURVE_POOL.exchange(
+            1, // cvxCRV
+            0, // CRV
+            cvxCRVToSwap,
+            cvxCRVToSwap.mul(90).div(100) //10% slippage // cvxCRV -> CVX is 97.5% at time of writing
+        );
+
+
+        // From CRV to CVX
+        // TODO: SET UP CRV
+        uint256 toSwap = IERC20Upgradeable(CRV).balanceOf(address(this));
+
         // Sushi reward to WETH to want
         address[] memory path = new address[](3);
-        path[0] = reward;
+        path[0] = CRV;
         path[1] = WETH;
         path[2] = CVX;
         IUniswapRouterV2(SUSHI_ROUTER).swapExactTokensForTokens(
