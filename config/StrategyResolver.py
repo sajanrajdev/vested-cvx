@@ -49,7 +49,8 @@ class StrategyResolver(StrategyCoreResolver):
         self.manager.printCompare(before, after)
         self.confirm_harvest_state(before, after, tx)
 
-        assert after.get("sett.pricePerFullShare") > before.get(
+        ## Just no loss as we are not compounding anything
+        assert after.get("sett.pricePerFullShare") >= before.get(
             "sett.pricePerFullShare"
         )
 

@@ -11,6 +11,7 @@ import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgrade
 
 import "../interfaces/uniswap/IUniswapRouterV2.sol";
 import "../interfaces/badger/ISettV3.sol";
+import "../interfaces/badger/ISettV4.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
 import "../interfaces/snapshot/IDelegateRegistry.sol";
@@ -32,6 +33,8 @@ contract MyStrategy is BaseStrategy {
     address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
     address public constant CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
 
+    address public constant BADGER_TREE = 0x660802Fc641b154aBA66a62137e71f331B6d787A;
+
     address public constant SUSHI_ROUTER =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
@@ -47,6 +50,9 @@ contract MyStrategy is BaseStrategy {
 
     ISettV3 public constant CVX_VAULT =
         ISettV3(0x53C8E199eb2Cb7c01543C137078a038937a68E40);
+    
+    ISettV4 public constant CVXCRV_VAULT =
+        ISettV4(0x2B5455aac8d64C14786c3a29858E43b5945819C0);
 
     // NOTE: At time of publishing, this contract is under audit
     ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
@@ -64,6 +70,20 @@ contract MyStrategy is BaseStrategy {
 
     // Used to signal to the Badger Tree that rewards where sent to it
     event TreeDistribution(
+        address indexed token,
+        uint256 amount,
+        uint256 indexed blockNumber,
+        uint256 timestamp
+    );
+    event PerformanceFeeGovernance(
+        address indexed destination,
+        address indexed token,
+        uint256 amount,
+        uint256 indexed blockNumber,
+        uint256 timestamp
+    );
+    event PerformanceFeeStrategist(
+        address indexed destination,
         address indexed token,
         uint256 amount,
         uint256 indexed blockNumber,
@@ -97,11 +117,12 @@ contract MyStrategy is BaseStrategy {
         withdrawalFee = _feeConfig[2];
 
         
+        IERC20Upgradeable(reward).safeApprove(address(CVXCRV_VAULT), type(uint256).max);
 
         /// @dev do one off approvals here
-        // Sushi to swap CRV -> CVX
+        // Sushi to swap CRV -> CVX // TODO: REMOVE
         IERC20Upgradeable(CRV).safeApprove(SUSHI_ROUTER, type(uint256).max);
-        // Curve to swap cvxCRV -> CRV
+        // Curve to swap cvxCRV -> CRV // TODO: REMOVE
         IERC20Upgradeable(reward).safeApprove(address(CURVE_POOL), type(uint256).max);
         // Permissions for Locker
         IERC20Upgradeable(CVX).safeApprove(address(LOCKER), type(uint256).max);
@@ -297,36 +318,40 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// @dev Harvest from strategy mechanics, realizing increase in underlying position
-    function harvest() public whenNotPaused returns (uint256 harvested) {
+    function harvest() public whenNotPaused returns (uint256) {
         _onlyAuthorizedActors();
 
-        uint256 _before = IERC20Upgradeable(want).balanceOf(address(this));
-
-        uint256 _beforeCVX = IERC20Upgradeable(reward).balanceOf(address(this));
+        uint256 _beforeReward = IERC20Upgradeable(reward).balanceOf(address(this));
 
         // Get cvxCRV
         LOCKER.getReward(address(this), false);
 
         // Rewards Math
         uint256 earnedReward =
-            IERC20Upgradeable(reward).balanceOf(address(this)).sub(_beforeCVX);
+            IERC20Upgradeable(reward).balanceOf(address(this)).sub(_beforeReward);
 
-        // Because we are using bCVX we take fees in reward
-        //NOTE: This will probably revert because we deposit and transfer on same block
-        (uint256 governancePerformanceFee, uint256 strategistPerformanceFee) =
-            _processRewardsFees(earnedReward, reward);
+        uint256 cvxCrvToGovernance = earnedReward.mul(performanceFeeGovernance).div(MAX_FEE);
+        if(cvxCrvToGovernance > 0){
+            CVXCRV_VAULT.depositFor(IController(controller).rewards(), cvxCrvToGovernance);
+            emit PerformanceFeeGovernance(IController(controller).rewards(), address(CVXCRV_VAULT), cvxCrvToGovernance, block.number, block.timestamp);
+        }
+        uint256 cvxCrvToStrategist = earnedReward.mul(performanceFeeStrategist).div(MAX_FEE);
+        if(cvxCrvToStrategist > 0){
+            CVXCRV_VAULT.depositFor(strategist, cvxCrvToStrategist);
+            emit PerformanceFeeStrategist(strategist, address(CVXCRV_VAULT), cvxCrvToStrategist, block.number, block.timestamp);   
+        }
 
-        // Swap cvxCRV for want (bCVX)
-        _swapcvxCRVToWant();
+        // Send rest of earned to tree //We send all rest to avoid dust and avoid protecting the token
+        uint256 cvxCrvToTree = IERC20Upgradeable(reward).balanceOf(address(this));
+        CVXCRV_VAULT.depositFor(BADGER_TREE, cvxCrvToTree);
+        emit TreeDistribution(address(CVXCRV_VAULT), cvxCrvToTree, block.number, block.timestamp);
 
-        uint256 earned =
-            IERC20Upgradeable(want).balanceOf(address(this)).sub(_before);
 
         /// @dev Harvest event that every strategy MUST have, see BaseStrategy
-        emit Harvest(earned, block.number);
+        emit Harvest(earnedReward, block.number);
 
         /// @dev Harvest must return the amount of want increased
-        return earned;
+        return earnedReward;
     }
 
     /// @dev Rebalance, Compound or Pay off debt here
@@ -335,95 +360,10 @@ contract MyStrategy is BaseStrategy {
         revert(); // NOTE: For now tend is replaced by manualRebalance
     }
 
-    /// @dev Swap from reward to CVX, then deposit into bCVX vault
-    function _swapcvxCRVToWant() internal {
-        uint256 cvxCRVToSwap = IERC20Upgradeable(reward).balanceOf(address(this));
-        if (cvxCRVToSwap == 0) {
-            return;
-        }
-
-        // From cvxCRV to CRV
-        CURVE_POOL.exchange(
-            1, // cvxCRV
-            0, // CRV
-            cvxCRVToSwap,
-            cvxCRVToSwap.mul(90).div(100) //10% slippage // cvxCRV -> CVX is 97.5% at time of writing
-        );
-
-
-        // From CRV to CVX
-        // TODO: SET UP CRV
-        uint256 toSwap = IERC20Upgradeable(CRV).balanceOf(address(this));
-
-        // Sushi reward to WETH to want
-        address[] memory path = new address[](3);
-        path[0] = CRV;
-        path[1] = WETH;
-        path[2] = CVX;
-        IUniswapRouterV2(SUSHI_ROUTER).swapExactTokensForTokens(
-            toSwap,
-            0,
-            path,
-            address(this),
-            now
-        );
-
-        // Deposit into vault
-        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
-        if (toDeposit > 0) {
-            CVX_VAULT.deposit(toDeposit);
-        }
-    }
-
-    /// ===== Internal Helper Functions =====
-
-    /// @dev used to manage the governance and strategist fee, make sure to use it to get paid!
-    function _processPerformanceFees(uint256 _amount)
-        internal
-        returns (
-            uint256 governancePerformanceFee,
-            uint256 strategistPerformanceFee
-        )
-    {
-        governancePerformanceFee = _processFee(
-            want,
-            _amount,
-            performanceFeeGovernance,
-            IController(controller).rewards()
-        );
-
-        strategistPerformanceFee = _processFee(
-            want,
-            _amount,
-            performanceFeeStrategist,
-            strategist
-        );
-    }
-
-    /// @dev used to manage the governance and strategist fee on earned rewards, make sure to use it to get paid!
-    function _processRewardsFees(uint256 _amount, address _token)
-        internal
-        returns (uint256 governanceRewardsFee, uint256 strategistRewardsFee)
-    {
-        governanceRewardsFee = _processFee(
-            _token,
-            _amount,
-            performanceFeeGovernance,
-            IController(controller).rewards()
-        );
-
-        strategistRewardsFee = _processFee(
-            _token,
-            _amount,
-            performanceFeeStrategist,
-            strategist
-        );
-    }
-
     /// MANUAL FUNCTIONS ///
 
     /// @dev manual function to reinvest all CVX that was locked
-    function reinvest() external whenNotPaused returns (uint256 reinvested) {
+    function reinvest() external whenNotPaused returns (uint256) {
         _onlyGovernance();
 
         if (processLocksOnReinvest) {
@@ -436,6 +376,8 @@ contract MyStrategy is BaseStrategy {
 
         // Redeposit into veCVX
         LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
+
+        return toDeposit;
     }
 
     /// @dev process all locks, to redeem

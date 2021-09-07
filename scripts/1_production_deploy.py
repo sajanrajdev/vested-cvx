@@ -38,9 +38,9 @@ def main():
     registry = BadgerRegistry.at(REGISTRY)
 
     strategist = registry.get("governance")
-    guardian = registry.get("guardian")
-    keeper = registry.get("keeper")
-    proxyAdmin = registry.get("proxyAdmin")
+    guardian = "0x29F7F8896Fb913CF7f9949C623F896a154727919"
+    keeper = "0x711a339c002386f9db409ca55b6a35a604ab6cf6"
+    proxyAdmin = "0x20Dce41Acca85E8222D6861Aa6D23B6C941777bF"
 
     assert strategist != AddressZero
     assert guardian != AddressZero
@@ -78,8 +78,8 @@ def main():
 def deploy_controller(dev, proxyAdmin):
 
     controller_logic = Controller.at(
-        "0x01d10fdc6b484BE380144dF12EB6C75387EfC49B"
-    )  # Controller Logic
+        "0x6354E79F21B56C11f48bcD7c451BE456D7102A36"
+    )
 
     # Deployer address will be used for all actors as controller will only be used for testing
     args = [
@@ -93,7 +93,7 @@ def deploy_controller(dev, proxyAdmin):
         controller_logic,
         proxyAdmin,
         controller_logic.initialize.encode_input(*args),
-        {"from": dev},
+        {"from": dev}
     )
     time.sleep(sleep_between_tx)
 
@@ -124,14 +124,14 @@ def deploy_vault(controller, governance, keeper, guardian, dev, proxyAdmin):
     print("Vault Arguments: ", args)
 
     vault_logic = SettV3.at(
-        "0xAF0B504BD20626d1fd57F8903898168FCE7ecbc8"
+        "0x889d5036f2EA5784161090082F3327bb3e433102"
     )  # SettV3 Logic
 
     vault_proxy = AdminUpgradeabilityProxy.deploy(
         vault_logic,
         proxyAdmin,
         vault_logic.initialize.encode_input(*args),
-        {"from": dev},
+        {"from": dev}
     )
     time.sleep(sleep_between_tx)
 
@@ -173,7 +173,7 @@ def deploy_strategy(
         strat_logic,
         proxyAdmin,
         strat_logic.initialize.encode_input(*args),
-        {"from": dev},
+        {"from": dev}
     )
     time.sleep(sleep_between_tx)
 

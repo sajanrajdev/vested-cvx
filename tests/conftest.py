@@ -99,12 +99,19 @@ def deployed():
     gov = accounts.at(sett.governance(), force=True)
     cvxVault.approveContractAccess(strategy, {"from": gov})
 
+    ## NOTE: THIS HAS TO BE DONE IN SETUP JUST FOR THIS STRAT
+    ## Approve the Strat for bcrvCVX
+    cvxCRVVault = SettV3.at(strategy.CVXCRV_VAULT())
+    gov = accounts.at(sett.governance(), force=True)
+    cvxCRVVault.approveContractAccess(strategy, {"from": gov})
+
     return DotMap(
         deployer=deployer,
         controller=controller,
         vault=sett,
         sett=sett,
         cvxVault=cvxVault,
+        cvxCRVVault=cvxCRVVault,
         strategy=strategy,
         governance=governance,
         gov=gov,
@@ -113,6 +120,7 @@ def deployed():
         lpComponent=lpComponent,
         rewardToken=rewardToken,
     )
+
 
 
 

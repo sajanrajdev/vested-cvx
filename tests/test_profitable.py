@@ -21,7 +21,7 @@ def test_is_profitable(deployed):
 
     snap = SnapshotManager(vault, strategy, controller, "StrategySnapshot")
 
-    reward = interface.IERC20(strategy.reward())
+    reward = interface.IERC20(strategy.CVXCRV_VAULT())
     reward_before = reward.balanceOf(strategy.strategist())
 
     # Deposit   
