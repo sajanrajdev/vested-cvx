@@ -139,34 +139,34 @@ contract MyStrategy is BaseStrategy {
 
     /// ===== Extra Functions =====
     /// @dev Change Delegation to another address
-    function manualSetDelegate(address delegate) public {
+    function manualSetDelegate(address delegate) external {
         _onlyGovernance();
         // Set delegate is enough as it will clear previous delegate automatically
         SNAPSHOT.setDelegate(DELEGATED_SPACE, delegate);
     }
 
     ///@dev Should we check if the amount requested is more than what we can return on withdrawal?
-    function setWithdrawalSafetyCheck(bool newWithdrawalSafetyCheck) public {
+    function setWithdrawalSafetyCheck(bool newWithdrawalSafetyCheck) external {
         _onlyGovernance();
         withdrawalSafetyCheck = newWithdrawalSafetyCheck;
     }
 
     ///@dev Should we harvest before doing manual rebalancing
     ///@notice you most likely want to skip harvest if everything is unlocked, or there's something wrong and you just want out
-    function setHarvestOnRebalance(bool newHarvestOnRebalance) public {
+    function setHarvestOnRebalance(bool newHarvestOnRebalance) external {
         _onlyGovernance();
         harvestOnRebalance = newHarvestOnRebalance;
     }
 
     ///@dev Should we processExpiredLocks during reinvest?
-    function setProcessLocksOnReinvest(bool newProcessLocksOnReinvest) public {
+    function setProcessLocksOnReinvest(bool newProcessLocksOnReinvest) external {
         _onlyGovernance();
         processLocksOnReinvest = newProcessLocksOnReinvest;
     }
 
     ///@dev Should we processExpiredLocks during manualRebalance?
     function setProcessLocksOnRebalance(bool newProcessLocksOnRebalance)
-        public
+        external
     {
         _onlyGovernance();
         processLocksOnRebalance = newProcessLocksOnRebalance;
