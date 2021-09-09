@@ -174,6 +174,12 @@ contract MyStrategy is BaseStrategy {
 
     /// ===== View Functions =====
 
+    function getBoostPayment() public view returns(uint256){
+        uint256 maximumBoostPayment = LOCKER.maximumBoostPayment();
+        require(maximumBoostPayment < 1500, "over max payment"); //max 15%
+        return maximumBoostPayment;
+    }
+
     /// @dev Specify the name of the strategy
     function getName() external pure override returns (string memory) {
         return "veCVX Voting Strategy";
@@ -263,7 +269,7 @@ contract MyStrategy is BaseStrategy {
         uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
 
         // Lock tokens for 16 weeks, send credit to strat, always use max boost cause why not?
-        LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
+        LOCKER.lock(address(this), toDeposit, getBoostPayment());
     }
 
     /// @dev utility function to convert all we can to bCVX
@@ -375,7 +381,7 @@ contract MyStrategy is BaseStrategy {
         uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
 
         // Redeposit into veCVX
-        LOCKER.lock(address(this), toDeposit, LOCKER.maximumBoostPayment());
+        LOCKER.lock(address(this), toDeposit, getBoostPayment());
 
         return toDeposit;
     }
@@ -461,10 +467,10 @@ contract MyStrategy is BaseStrategy {
         uint256 maxCVX = IERC20Upgradeable(CVX).balanceOf(address(this));
         if (cvxToLock > maxCVX) {
             // Just lock what we can
-            LOCKER.lock(address(this), maxCVX, LOCKER.maximumBoostPayment());
+            LOCKER.lock(address(this), maxCVX, getBoostPayment());
         } else {
             // Lock proper
-            LOCKER.lock(address(this), cvxToLock, LOCKER.maximumBoostPayment());
+            LOCKER.lock(address(this), cvxToLock, getBoostPayment());
         }
 
         // If anything else is left, deposit into vault
