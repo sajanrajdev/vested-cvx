@@ -438,17 +438,11 @@ contract MyStrategy is BaseStrategy {
         uint256 totalCVXBalance =
             balanceOfCVX.add(balanceInLock).add(wantToCVX(balanceOfWant));
 
-        //Ratios
-        uint256 currentLockRatio =
-            balanceInLock.mul(10**18).div(totalCVXBalance);
         // Amount we want to have in lock
-        uint256 newLockRatio = totalCVXBalance.mul(toLock).div(MAX_BPS);
-        // Amount we want to have in bCVX
-        uint256 toWantRatio =
-            totalCVXBalance.mul(MAX_BPS.sub(toLock)).div(MAX_BPS);
+        uint256 newLockAmount = totalCVXBalance.mul(toLock).div(MAX_BPS);
 
         // We can't unlock enough, just deposit rest into bCVX
-        if (newLockRatio <= currentLockRatio) {
+        if (newLockAmount <= balanceInLock) {
             // Deposit into vault
             uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
             if (toDeposit > 0) {
@@ -459,7 +453,7 @@ contract MyStrategy is BaseStrategy {
         }
 
         // If we're continuing, then we are going to lock something (unless it's zero)
-        uint256 cvxToLock = newLockRatio.sub(currentLockRatio);
+        uint256 cvxToLock = newLockAmount.sub(balanceInLock);
 
         // NOTE: We only lock the CVX we have and not the bCVX
         // bCVX should be sent back to vault and then go through earn
