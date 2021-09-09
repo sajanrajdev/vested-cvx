@@ -362,8 +362,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Rebalance, Compound or Pay off debt here
     function tend() external whenNotPaused {
-        _onlyAuthorizedActors();
-        revert(); // NOTE: For now tend is replaced by manualRebalance
+        revert("no op"); // NOTE: For now tend is replaced by manualRebalance
     }
 
     /// MANUAL FUNCTIONS ///
