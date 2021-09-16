@@ -213,15 +213,8 @@ contract MyStrategy is BaseStrategy {
         protectedTokens[2] = reward;
         return protectedTokens;
     }
-
-    /// ===== Permissioned Actions: Governance =====
-    /// @notice Delete if you don't need!
-    function setKeepReward(uint256 _setKeepReward) external {
-        _onlyGovernance();
-    }
-
+    
     /// ===== Internal Core Implementations =====
-
     /// @dev security check to avoid moving tokens that would cause a rugpull, edit based on strat
     function _onlyNotProtectedTokens(address _asset) internal override {
         address[] memory protectedTokens = getProtectedTokens();
