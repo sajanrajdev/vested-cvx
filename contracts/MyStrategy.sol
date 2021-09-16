@@ -45,9 +45,6 @@ contract MyStrategy is BaseStrategy {
     // NOTE: At time of publishing, this contract is under audit
     ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
 
-    // Curve Pool to swap between cvxCRV and CRV
-    ICurvePool public constant CURVE_POOL = ICurvePool(0x9D0464996170c6B9e75eED71c68B99dDEDf279e8);
-
     bool public withdrawalSafetyCheck = true;
     bool public harvestOnRebalance = true;
     // If nothing is unlocked, processExpiredLocks will revert
