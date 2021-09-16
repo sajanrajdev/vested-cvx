@@ -20,9 +20,7 @@ def test_check_manual_permissions(
     with brownie.reverts():
         strategy.manualProcessExpiredLocks({"from": rando})
     with brownie.reverts():
-        strategy.manualDepositCVXIntoVault({"from": rando})
-    with brownie.reverts():
-        strategy.manualSendbCVXToVault({"from": rando})
+        strategy.manualSendCVXToVault({"from": rando})
     with brownie.reverts():
         strategy.manualRebalance(0, {"from": rando})
 
@@ -32,8 +30,6 @@ def test_check_manual_permissions(
     with brownie.reverts():
         strategy.manualProcessExpiredLocks({"from": strategist})
     with brownie.reverts():
-        strategy.manualDepositCVXIntoVault({"from": strategist})
-    with brownie.reverts():
-        strategy.manualSendbCVXToVault({"from": strategist})
+        strategy.manualSendCVXToVault({"from": strategist})
     with brownie.reverts():
         strategy.manualRebalance(0, {"from": strategist})
