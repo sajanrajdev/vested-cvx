@@ -224,7 +224,7 @@ contract MyStrategy is BaseStrategy {
             "You have to wait for unlock or have to manually rebalance out of it"
         );
 
-        // Make sure to call prepareWithdrawAll before prepareWithdrawAll
+        // Make sure to call prepareWithdrawAll before _withdrawAll
     }
 
     /// @dev withdraw the specified amount of want, liquidate from lpComponent to want, paying off any necessary debt for the conversion
