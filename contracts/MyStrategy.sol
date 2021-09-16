@@ -5,12 +5,9 @@ pragma experimental ABIEncoderV2;
 
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
-import "../deps/@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
-import "../interfaces/uniswap/IUniswapRouterV2.sol";
-import "../interfaces/badger/ISettV3.sol";
 import "../interfaces/badger/ISettV4.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
@@ -46,9 +43,6 @@ contract MyStrategy is BaseStrategy {
 
     bytes32 public constant DELEGATED_SPACE =
         0x6376782e65746800000000000000000000000000000000000000000000000000;
-
-    ISettV3 public constant CVX_VAULT =
-        ISettV3(0x53C8E199eb2Cb7c01543C137078a038937a68E40);
     
     ISettV4 public constant CVXCRV_VAULT =
         ISettV4(0x2B5455aac8d64C14786c3a29858E43b5945819C0);
@@ -125,12 +119,6 @@ contract MyStrategy is BaseStrategy {
         IERC20Upgradeable(reward).safeApprove(address(CURVE_POOL), type(uint256).max);
         // Permissions for Locker
         IERC20Upgradeable(want).safeApprove(address(LOCKER), type(uint256).max);
-        IERC20Upgradeable(want).safeApprove(
-            address(CVX_VAULT),
-            type(uint256).max
-        );
-
-
 
         // Delegate voting to DELEGATE
         SNAPSHOT.setDelegate(DELEGATED_SPACE, DELEGATE);
@@ -213,7 +201,7 @@ contract MyStrategy is BaseStrategy {
         protectedTokens[2] = reward;
         return protectedTokens;
     }
-    
+
     /// ===== Internal Core Implementations =====
     /// @dev security check to avoid moving tokens that would cause a rugpull, edit based on strat
     function _onlyNotProtectedTokens(address _asset) internal override {
