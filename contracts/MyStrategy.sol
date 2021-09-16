@@ -244,8 +244,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev utility function to withdraw all CVX that we can from the lock
     function prepareWithdrawAll() external {
-        _onlyGovernance();
-        LOCKER.processExpiredLocks(false);
+        manualProcessExpiredLocks();
     }
 
     /// @dev utility function to withdraw everything for migration
@@ -346,7 +345,7 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// @dev process all locks, to redeem
-    function manualProcessExpiredLocks() external whenNotPaused {
+    function manualProcessExpiredLocks() public whenNotPaused {
         _onlyGovernance();
         LOCKER.processExpiredLocks(false);
         // Unlock veCVX that is expired and redeem CVX back to this strat
