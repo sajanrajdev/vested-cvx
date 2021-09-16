@@ -190,33 +190,10 @@ contract MyStrategy is BaseStrategy {
         return "1.0";
     }
 
-    /// @dev From CVX Token to Helper Vault Token
-    function CVXToWant(uint256 cvx) public view returns (uint256) {
-        uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare();
-        return cvx.mul(10**18).div(bCVXToCVX);
-    }
-
-    /// @dev From Helper Vault Token to CVX Token
-    function wantToCVX(uint256 want) public view returns (uint256) {
-        uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare();
-        return want.mul(bCVXToCVX).div(10**18);
-    }
-
     /// @dev Balance of want currently held in strategy positions
     function balanceOfPool() public view override returns (uint256) {
-        if (withdrawalSafetyCheck) {
-            uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
-            require(bCVXToCVX > 10**18, "Loss Of Peg"); // Avoid trying to redeem for less / loss of peg
-        }
-
-        // Return the balance in locker + unlocked but not withdrawn, better estimate to allow some withdrawals
-        // then multiply it by the price per share as we need to convert CVX to bCVX
-        uint256 valueInLocker =
-            CVXToWant(LOCKER.lockedBalanceOf(address(this))).add(
-                CVXToWant(IERC20Upgradeable(CVX).balanceOf(address(this)))
-            );
-
-        return (valueInLocker);
+        // Return the balance in locker
+        return LOCKER.lockedBalanceOf(address(this));
     }
 
     /// @dev Returns true if this strategy requires tending
@@ -235,7 +212,6 @@ contract MyStrategy is BaseStrategy {
         protectedTokens[0] = want;
         protectedTokens[1] = lpComponent;
         protectedTokens[2] = reward;
-        protectedTokens[3] = CVX;
         return protectedTokens;
     }
 
@@ -263,26 +239,15 @@ contract MyStrategy is BaseStrategy {
     /// @notice When this function is called, the controller has already sent want to this
     /// @notice Just get the current balance and then invest accordingly
     function _deposit(uint256 _amount) internal override {
-        // We receive bCVX -> Convert to CVX
-        CVX_VAULT.withdraw(_amount);
-
-        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
-
         // Lock tokens for 16 weeks, send credit to strat, always use max boost cause why not?
-        LOCKER.lock(address(this), toDeposit, getBoostPayment());
+        LOCKER.lock(address(this), _amount, getBoostPayment());
     }
 
     /// @dev utility function to convert all we can to bCVX
     /// @notice You may want to harvest before calling this to maximize the amount of bCVX you'll have
     function prepareWithdrawAll() external {
         _onlyGovernance();
-
         LOCKER.processExpiredLocks(false);
-
-        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
-        if (toDeposit > 0) {
-            CVX_VAULT.deposit(toDeposit);
-        }
     }
 
     /// @dev utility function to withdraw everything for migration
@@ -292,11 +257,12 @@ contract MyStrategy is BaseStrategy {
         require(
             LOCKER.lockedBalanceOf(address(this)) == 0 &&
                 LOCKER.balanceOf(address(this)) == 0,
-            "You have to wait for unlock and have to manually rebalance out of it"
+            "You have to wait for unlock or have to manually rebalance out of it"
         );
 
         // NO-OP because you can't deposit AND transfer with bCVX
         // See prepareWithdrawAll above
+        
     }
 
     /// @dev withdraw the specified amount of want, liquidate from lpComponent to want, paying off any necessary debt for the conversion
@@ -308,8 +274,6 @@ contract MyStrategy is BaseStrategy {
         uint256 max = IERC20Upgradeable(want).balanceOf(address(this));
 
         if (withdrawalSafetyCheck) {
-            uint256 bCVXToCVX = CVX_VAULT.getPricePerFullShare(); // 18 decimals
-            require(bCVXToCVX > 10**18, "Loss Of Peg"); // Avoid trying to redeem for less / loss of peg
             require(
                 max >= _amount.mul(9_980).div(MAX_BPS),
                 "Withdrawal Safety Check"
@@ -393,26 +357,16 @@ contract MyStrategy is BaseStrategy {
         // Processed in the next harvest or during prepareMigrateAll
     }
 
-    /// @dev Take all CVX and deposits in the CVX_VAULT
-    function manualDepositCVXIntoVault() external whenNotPaused {
-        _onlyGovernance();
-
-        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
-        if (toDeposit > 0) {
-            CVX_VAULT.deposit(toDeposit);
-        }
-    }
-
-    /// @dev Send all available bCVX to the Vault
+    /// @dev Send all available CVX to the Vault
     /// @notice you can do this so you can earn again (re-lock), or just to add to the redemption pool
-    function manualSendbCVXToVault() external whenNotPaused {
+    function manualSendCVXToVault() external whenNotPaused {
         _onlyGovernance();
-        uint256 bCvxAmount = IERC20Upgradeable(want).balanceOf(address(this));
-        _transferToVault(bCvxAmount);
+        uint256 cvxAmount = IERC20Upgradeable(want).balanceOf(address(this));
+        _transferToVault(cvxAmount);
     }
 
-    /// @dev use the currently available CVX to either lock or add to bCVX
-    /// @notice toLock = 0, lock nothing, deposit in bCVX as much as you can
+    /// @dev use the currently available CVX to lock
+    /// @notice toLock = 0, lock nothing, deposit in CVX as much as you can
     /// @notice toLock = 10_000, lock everything (CVX) you have
     function manualRebalance(uint256 toLock) external whenNotPaused {
         _onlyGovernance();
@@ -430,24 +384,16 @@ contract MyStrategy is BaseStrategy {
         // Token that is highly liquid
         uint256 balanceOfWant =
             IERC20Upgradeable(want).balanceOf(address(this));
-        // CVX uninvested we got from harvest and unlocks
-        uint256 balanceOfCVX = IERC20Upgradeable(CVX).balanceOf(address(this));
         // Locked CVX in the locker
         uint256 balanceInLock = LOCKER.balanceOf(address(this));
         uint256 totalCVXBalance =
-            balanceOfCVX.add(balanceInLock).add(wantToCVX(balanceOfWant));
+            balanceOfWant.add(balanceInLock);
 
         // Amount we want to have in lock
         uint256 newLockAmount = totalCVXBalance.mul(toLock).div(MAX_BPS);
 
-        // We can't unlock enough, just deposit rest into bCVX
+        // We can't unlock enough, no-op
         if (newLockAmount <= balanceInLock) {
-            // Deposit into vault
-            uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
-            if (toDeposit > 0) {
-                CVX_VAULT.deposit(toDeposit);
-            }
-
             return;
         }
 
@@ -465,12 +411,5 @@ contract MyStrategy is BaseStrategy {
             // Lock proper
             LOCKER.lock(address(this), cvxToLock, getBoostPayment());
         }
-
-        // If anything else is left, deposit into vault
-        uint256 cvxLeft = IERC20Upgradeable(CVX).balanceOf(address(this));
-        if (cvxLeft > 0) {
-            CVX_VAULT.deposit(cvxLeft);
-        }
-        // At the end of the rebalance, there won't be any balanceOfCVX as that token is not considered by our strat
     }
 }
