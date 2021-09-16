@@ -149,7 +149,7 @@ contract MyStrategy is BaseStrategy {
 
     function getBoostPayment() public view returns(uint256){
         uint256 maximumBoostPayment = LOCKER.maximumBoostPayment();
-        require(maximumBoostPayment < 1500, "over max payment"); //max 15%
+        require(maximumBoostPayment <= 1500, "over max payment"); //max 15%
         return maximumBoostPayment;
     }
 
