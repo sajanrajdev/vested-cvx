@@ -306,7 +306,7 @@ contract MyStrategy is BaseStrategy {
         uint256 toDeposit = IERC20Upgradeable(want).balanceOf(address(this));
 
         // Redeposit into veCVX
-        LOCKER.lock(address(this), toDeposit, getBoostPayment());
+        _deposit(toDeposit);
 
         return toDeposit;
     }
@@ -316,7 +316,6 @@ contract MyStrategy is BaseStrategy {
         _onlyGovernance();
         LOCKER.processExpiredLocks(false);
         // Unlock veCVX that is expired and redeem CVX back to this strat
-        // Processed in the next harvest or during prepareMigrateAll
     }
 
     /// @dev Send all available CVX to the Vault
@@ -359,7 +358,7 @@ contract MyStrategy is BaseStrategy {
             return;
         }
 
-        // If we're continuing, then we are going to lock something (unless it's zero)
+        // If we're continuing, then we are going to lock something
         uint256 cvxToLock = newLockAmount.sub(balanceInLock);
 
         // We only lock up to the available CVX
