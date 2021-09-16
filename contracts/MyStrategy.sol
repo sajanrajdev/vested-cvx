@@ -242,15 +242,14 @@ contract MyStrategy is BaseStrategy {
         LOCKER.lock(address(this), _amount, getBoostPayment());
     }
 
-    /// @dev utility function to convert all we can to bCVX
-    /// @notice You may want to harvest before calling this to maximize the amount of bCVX you'll have
+    /// @dev utility function to withdraw all CVX that we can from the lock
     function prepareWithdrawAll() external {
         _onlyGovernance();
         LOCKER.processExpiredLocks(false);
     }
 
     /// @dev utility function to withdraw everything for migration
-    /// @dev NOTE: You cannot call this unless you have rebalanced to have only bCVX left in the vault
+    /// @dev NOTE: You cannot call this unless you have rebalanced to have only CVX left in the vault
     function _withdrawAll() internal override {
         //NOTE: This probably will always fail unless we have all tokens expired
         require(
@@ -259,9 +258,7 @@ contract MyStrategy is BaseStrategy {
             "You have to wait for unlock or have to manually rebalance out of it"
         );
 
-        // NO-OP because you can't deposit AND transfer with bCVX
-        // See prepareWithdrawAll above
-        
+        // Make sure to call prepareWithdrawAll before prepareWithdrawAll
     }
 
     /// @dev withdraw the specified amount of want, liquidate from lpComponent to want, paying off any necessary debt for the conversion
@@ -399,9 +396,7 @@ contract MyStrategy is BaseStrategy {
         // If we're continuing, then we are going to lock something (unless it's zero)
         uint256 cvxToLock = newLockAmount.sub(balanceInLock);
 
-        // NOTE: We only lock the CVX we have and not the bCVX
-        // bCVX should be sent back to vault and then go through earn
-        // We do this because bCVX has "blockLock" and we can't both deposit and withdraw on the same block
+        // We only lock up to the available CVX
         uint256 maxCVX = IERC20Upgradeable(want).balanceOf(address(this));
         if (cvxToLock > maxCVX) {
             // Just lock what we can
