@@ -51,8 +51,6 @@ contract MyStrategy is BaseStrategy {
     bool public processLocksOnReinvest = true;
     bool public processLocksOnRebalance = true;
 
-    event Debug(string name, uint256 value);
-
     // Used to signal to the Badger Tree that rewards where sent to it
     event TreeDistribution(
         address indexed token,
