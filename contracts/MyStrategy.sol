@@ -24,13 +24,12 @@ contract MyStrategy is BaseStrategy {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
 
-    uint256 MAX_BPS = 10_000;
+    uint256 public constant MAX_BPS = 10_000;
 
     // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
     address public lpComponent; // Token we provide liquidity with
     address public reward; // Token we farm and swap to want / lpComponent
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
     address public constant CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
 
     address public constant BADGER_TREE = 0x660802Fc641b154aBA66a62137e71f331B6d787A;
@@ -125,8 +124,8 @@ contract MyStrategy is BaseStrategy {
         // Curve to swap cvxCRV -> CRV // TODO: REMOVE
         IERC20Upgradeable(reward).safeApprove(address(CURVE_POOL), type(uint256).max);
         // Permissions for Locker
-        IERC20Upgradeable(CVX).safeApprove(address(LOCKER), type(uint256).max);
-        IERC20Upgradeable(CVX).safeApprove(
+        IERC20Upgradeable(want).safeApprove(address(LOCKER), type(uint256).max);
+        IERC20Upgradeable(want).safeApprove(
             address(CVX_VAULT),
             type(uint256).max
         );
@@ -341,7 +340,7 @@ contract MyStrategy is BaseStrategy {
         }
 
         // Redeposit all into veCVX
-        uint256 toDeposit = IERC20Upgradeable(CVX).balanceOf(address(this));
+        uint256 toDeposit = IERC20Upgradeable(want).balanceOf(address(this));
 
         // Redeposit into veCVX
         LOCKER.lock(address(this), toDeposit, getBoostPayment());
@@ -403,13 +402,19 @@ contract MyStrategy is BaseStrategy {
         // NOTE: We only lock the CVX we have and not the bCVX
         // bCVX should be sent back to vault and then go through earn
         // We do this because bCVX has "blockLock" and we can't both deposit and withdraw on the same block
-        uint256 maxCVX = IERC20Upgradeable(CVX).balanceOf(address(this));
+        uint256 maxCVX = IERC20Upgradeable(want).balanceOf(address(this));
         if (cvxToLock > maxCVX) {
             // Just lock what we can
             LOCKER.lock(address(this), maxCVX, getBoostPayment());
         } else {
             // Lock proper
             LOCKER.lock(address(this), cvxToLock, getBoostPayment());
+        }
+
+        // If anything left, send to vault
+        uint256 cvxLeft = IERC20Upgradeable(want).balanceOf(address(this));
+        if(cvxLeft > 0){
+            _transferToVault(cvxLeft);
         }
     }
 }
