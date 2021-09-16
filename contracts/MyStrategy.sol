@@ -207,7 +207,7 @@ contract MyStrategy is BaseStrategy {
         override
         returns (address[] memory)
     {
-        address[] memory protectedTokens = new address[](4);
+        address[] memory protectedTokens = new address[](3);
         protectedTokens[0] = want;
         protectedTokens[1] = lpComponent;
         protectedTokens[2] = reward;
