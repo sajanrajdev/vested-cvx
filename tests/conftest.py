@@ -43,7 +43,7 @@ def deployed():
     controller = Controller.deploy({"from": deployer})
     controller.initialize(BADGER_DEV_MULTISIG, strategist, keeper, BADGER_DEV_MULTISIG)
 
-    sett = SettV3.deploy({"from": deployer})
+    sett = SettV4.deploy({"from": deployer})
     sett.initialize(
         WANT,
         controller,
@@ -95,7 +95,7 @@ def deployed():
 
     ## NOTE: THIS HAS TO BE DONE IN SETUP JUST FOR THIS STRAT
     ## Approve the Strat for bcrvCVX
-    cvxCRVVault = SettV3.at(strategy.CVXCRV_VAULT())
+    cvxCRVVault = SettV4.at(strategy.CVXCRV_VAULT())
     gov = accounts.at(sett.governance(), force=True)
     cvxCRVVault.approveContractAccess(strategy, {"from": gov})
 
