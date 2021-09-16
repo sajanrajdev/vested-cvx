@@ -26,13 +26,8 @@ contract MyStrategy is BaseStrategy {
     // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
     address public lpComponent; // Token we provide liquidity with
     address public reward; // Token we farm and swap to want / lpComponent
-    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
 
     address public constant BADGER_TREE = 0x660802Fc641b154aBA66a62137e71f331B6d787A;
-
-    address public constant SUSHI_ROUTER =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
     IDelegateRegistry public constant SNAPSHOT =
         IDelegateRegistry(0x469788fE6E9E9681C6ebF3bF78e7Fd26Fc015446);
@@ -113,10 +108,6 @@ contract MyStrategy is BaseStrategy {
         IERC20Upgradeable(reward).safeApprove(address(CVXCRV_VAULT), type(uint256).max);
 
         /// @dev do one off approvals here
-        // Sushi to swap CRV -> CVX // TODO: REMOVE
-        IERC20Upgradeable(CRV).safeApprove(SUSHI_ROUTER, type(uint256).max);
-        // Curve to swap cvxCRV -> CRV // TODO: REMOVE
-        IERC20Upgradeable(reward).safeApprove(address(CURVE_POOL), type(uint256).max);
         // Permissions for Locker
         IERC20Upgradeable(want).safeApprove(address(LOCKER), type(uint256).max);
 
