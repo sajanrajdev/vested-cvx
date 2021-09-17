@@ -34,8 +34,8 @@ def main():
     dev = connect_account()
 
     # Add deployed Strategy and Vault contracts here:
-    strategy = MyStrategy.at("0x809990849D53a5109e0cb9C446137793B9f6f1Eb")
-    vault = SettV4.at("0x6B2d4c4bb50274c5D4986Ff678cC971c0260E967")
+    strategy = MyStrategy.at("0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9")
+    vault = SettV4.at("0xfd05D3C7fe2924020620A8bE4961bBaA747e6305")
 
     assert strategy.paused() == False
     assert vault.paused() == False
@@ -87,14 +87,14 @@ def set_parameters(dev, strategy, vault, governance, guardian, keeper, controlle
     console.print("[green]Controller existing or set at: [/green]", controller)
 
     # Set Fees
-    if strategy.performanceFeeGovernance() != 1000:
-        strategy.setPerformanceFeeGovernance(1000, {"from": dev})
+    if strategy.performanceFeeGovernance() != 0:
+        strategy.setPerformanceFeeGovernance(0, {"from": dev})
         time.sleep(sleep_between_tx)
-    if strategy.performanceFeeStrategist() != 1000:
-        strategy.setPerformanceFeeStrategist(1000, {"from": dev})
+    if strategy.performanceFeeStrategist() != 0:
+        strategy.setPerformanceFeeStrategist(0, {"from": dev})
         time.sleep(sleep_between_tx)
-    if strategy.withdrawalFee() != 50:
-        strategy.setWithdrawalFee(50, {"from": dev})
+    if strategy.withdrawalFee() != 10:
+        strategy.setWithdrawalFee(10, {"from": dev})
         time.sleep(sleep_between_tx)
 
     console.print("[green]Fees existing or set at: [/green]", "1000, 1000, 50")
@@ -145,9 +145,9 @@ def check_parameters(
     assert strategy.controller() == controller
     assert vault.controller() == controller
 
-    assert strategy.performanceFeeGovernance() == 1000
-    assert strategy.performanceFeeStrategist() == 1000
-    assert strategy.withdrawalFee() == 50
+    assert strategy.performanceFeeGovernance() == 0
+    assert strategy.performanceFeeStrategist() == 0
+    assert strategy.withdrawalFee() == 10
 
     assert strategy.keeper() == keeper
     assert vault.keeper() == keeper

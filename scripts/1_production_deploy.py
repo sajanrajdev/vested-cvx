@@ -42,10 +42,15 @@ def main():
     keeper = "0x711a339c002386f9db409ca55b6a35a604ab6cf6"
     proxyAdmin = "0x20Dce41Acca85E8222D6861Aa6D23B6C941777bF"
 
+    name = "Badger Vested Escrow " ## Keep a space so it looks nice
+    symbol = "bve" ## e.g CVX is want -> symbol bveSymbolPrefixHereCVX
+
     assert strategist != AddressZero
     assert guardian != AddressZero
     assert keeper != AddressZero
     assert proxyAdmin != AddressZero
+    assert name != "Name Prefix Here"
+    assert symbol != "bveSymbolPrefixHere"
 
     # Deploy controller
     controller = deploy_controller(dev, proxyAdmin)
@@ -58,18 +63,22 @@ def main():
         guardian,
         dev,
         proxyAdmin,
+        name,
+        symbol
     )
 
     # Deploy Strategy
-    strategy = deploy_strategy(
-        controller.address,
-        dev.address,  # Deployer will be set as governance for testing stage
-        strategist,
-        keeper,
-        guardian,
-        dev,
-        proxyAdmin,
-    )
+    # strategy = deploy_strategy(
+    #     controller.address,
+    #     dev.address,  # Deployer will be set as governance for testing stage
+    #     strategist,
+    #     keeper,
+    #     guardian,
+    #     dev,
+    #     proxyAdmin,
+    # )
+
+    strategy = MyStrategy.at("0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9")
 
     # Wire up vault and strategy to test controller
     wire_up_test_controller(controller, vault, strategy, dev)
@@ -108,7 +117,7 @@ def deploy_controller(dev, proxyAdmin):
     return controller_proxy
 
 
-def deploy_vault(controller, governance, keeper, guardian, dev, proxyAdmin):
+def deploy_vault(controller, governance, keeper, guardian, dev, proxyAdmin, name, symbol):
 
     args = [
         WANT,
@@ -116,9 +125,9 @@ def deploy_vault(controller, governance, keeper, guardian, dev, proxyAdmin):
         governance,
         keeper,
         guardian,
-        False,
-        "",
-        "",
+        True,
+        name,
+        symbol,
     ]
 
     print("Vault Arguments: ", args)
@@ -200,6 +209,10 @@ def wire_up_test_controller(controller, vault, strategy, dev):
     assert controller.vaults(WANT) == vault.address
 
     console.print("[blue]Controller wired up![/blue]")
+
+    console.print("[blue]Controller wired up![/blue]")
+    console.print(vault.name())
+    console.print(vault.symbol())
 
 
 def connect_account():
