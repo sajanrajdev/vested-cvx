@@ -97,7 +97,7 @@ def set_parameters(dev, strategy, vault, governance, guardian, keeper, controlle
         strategy.setWithdrawalFee(10, {"from": dev})
         time.sleep(sleep_between_tx)
 
-    console.print("[green]Fees existing or set at: [/green]", "1000, 1000, 50")
+    console.print("[green]Fees existing or set at: [/green]", "0, 0, 10")
 
     # Set permissioned accounts
     if strategy.keeper() != keeper:
