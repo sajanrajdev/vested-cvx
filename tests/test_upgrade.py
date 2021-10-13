@@ -106,6 +106,13 @@ def test_upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_prox
     assert prev_check_processLocksOnReinvest == strat_proxy.processLocksOnReinvest()
     assert prev_check_processLocksOnRebalance == strat_proxy.processLocksOnRebalance()
 
+    ## Verify new Addresses are setup properly
+    assert strat_proxy.LOCKER() == "0xD18140b4B819b895A3dba5442F959fA44994AF50"
+    assert strat_proxy.CVX_EXTRA_REWARDS() == "0x8Ed4bbf39E3080b35DA84a13A0D1A2FDcE1e0602"
+    assert strat_proxy.VOTIUM_BRIBE_CLAIMER() == "0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A"
+    assert strat_proxy.BRIBES_RECEIVER() == "0x6F76C6A1059093E21D8B1C13C4e20D8335e2909F"
+
+
     ## Also run all ordinary operation just because
     with brownie.reverts("no op"):
         ## Tend successfully fails as we hardcoded a revert
