@@ -11,11 +11,18 @@ import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgrade
 import "../interfaces/badger/ISettV4.sol";
 import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
+import "../interfaces/cvx/ICVXBribes.sol";
+import "../interfaces/cvx/IVotiumBribes.sol";
 import "../interfaces/snapshot/IDelegateRegistry.sol";
 import "../interfaces/curve/ICurvePool.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
+/**
+ * CHANGELOG
+ * V1.0 Initial Release, can lock
+ * V1.1 Update to handle bribes which are sent to a multisig
+ */
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
@@ -44,6 +51,13 @@ contract MyStrategy is BaseStrategy {
 
     // NOTE: At time of publishing, this contract is under audit
     ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
+
+    ICVXBribes public constant CVX_EXTRA_REWARDS = ICVXBribes(0x8Ed4bbf39E3080b35DA84a13A0D1A2FDcE1e0602);
+    IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);
+    
+    // We hardcode, an upgrade is required to change this as it's a meaningful change
+    address public constant BRIBES_RECEIVER = 0x6F76C6A1059093E21D8B1C13C4e20D8335e2909F;
+    
 
     bool public withdrawalSafetyCheck = false;
     bool public harvestOnRebalance = false;
@@ -145,6 +159,103 @@ contract MyStrategy is BaseStrategy {
         processLocksOnRebalance = newProcessLocksOnRebalance;
     }
 
+    /// *** Bribe Claiming ***
+    /// @dev given a token address, claim that as reward from CVX Extra Rewards
+    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
+    /// @notice for security reasons, you can't claim a bribe for a protected token
+    function claimBribeFromConvex (address token) external {
+        _onlyGovernanceOrStrategist();
+
+        // Revert if you try to claim a protected token, this is to avoid rugging
+        _onlyNotProtectedTokens(token);
+        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
+
+        // Claim reward for token
+        CVX_EXTRA_REWARDS.getReward(address(this), token);
+
+        // Send reward to Multisig
+        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
+        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
+    }
+
+    /// @dev given a list of token addresses, claim that as reward from CVX Extra Rewards
+    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
+    /// @notice for security reasons, you can't claim a bribe for a protected token
+    function claimBribesFromConvex(address[] calldata tokens) external {
+        _onlyGovernanceOrStrategist();
+
+        // Revert if you try to claim a protected token, this is to avoid rugging
+        uint256 length = tokens.length;
+        for(uint i = 0; i < length; i++){
+            _onlyNotProtectedTokens(tokens[i]);
+        }
+        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
+
+        // Claim reward for tokens
+        CVX_EXTRA_REWARDS.getRewards(address(this), tokens);
+
+        // Send reward to Multisig
+        for(uint x = 0; x < length; x++){
+            uint256 toSend = IERC20Upgradeable(tokens[x]).balanceOf(address(this));
+            IERC20Upgradeable(tokens[x]).safeTransfer(BRIBES_RECEIVER, toSend);
+        }
+    }
+
+    function claimBribeFromVotium(
+        address token, 
+        uint256 index, 
+        address account, 
+        uint256 amount, 
+        bytes32[] calldata merkleProof
+    ) external {
+        _onlyGovernanceOrStrategist();
+
+        // Revert if you try to claim a protected token, this is to avoid rugging
+        _onlyNotProtectedTokens(token);
+        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
+
+        VOTIUM_BRIBE_CLAIMER.claim(token, index, account, amount, merkleProof);
+
+        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
+        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
+    }
+
+    function claimBribesFromVotium(
+        address account, 
+        address[] calldata tokens, 
+        uint256[] calldata indexes,
+        uint256[] calldata amounts, 
+        bytes32[][] calldata merkleProofs
+    ) external {
+        _onlyGovernanceOrStrategist();
+
+        // Revert if you try to claim a protected token, this is to avoid rugging
+        uint256 length = tokens.length;
+        require(length == indexes.length && length == amounts.length && length == merkleProofs.length, "Length Mismatch");
+
+        for(uint i = 0; i < length; i++){
+            _onlyNotProtectedTokens(tokens[i]);
+        }
+        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
+
+        IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](length);
+        for(uint x = 0; x < length; x++){
+            request[x] = IVotiumBribes.claimParam({
+                token: tokens[x],
+                index: indexes[x],
+                amount: amounts[x],
+                merkleProof: merkleProofs[x]
+            });
+        }
+
+        VOTIUM_BRIBE_CLAIMER.claimMulti(account, request);
+
+        for(uint i = 0; i < length; i++){
+            uint256 toSend = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
+            IERC20Upgradeable(tokens[i]).safeTransfer(BRIBES_RECEIVER, toSend);
+        }
+    }
+
     /// ===== View Functions =====
 
     function getBoostPayment() public view returns(uint256){
@@ -160,7 +271,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.0";
+        return "1.1";
     }
 
     /// @dev Balance of want currently held in strategy positions
