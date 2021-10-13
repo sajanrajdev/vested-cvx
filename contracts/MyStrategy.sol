@@ -45,11 +45,11 @@ contract MyStrategy is BaseStrategy {
     // NOTE: At time of publishing, this contract is under audit
     ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
 
-    bool public withdrawalSafetyCheck = true;
-    bool public harvestOnRebalance = true;
+    bool public withdrawalSafetyCheck = false;
+    bool public harvestOnRebalance = false;
     // If nothing is unlocked, processExpiredLocks will revert
-    bool public processLocksOnReinvest = true;
-    bool public processLocksOnRebalance = true;
+    bool public processLocksOnReinvest = false;
+    bool public processLocksOnRebalance = false;
 
     // Used to signal to the Badger Tree that rewards where sent to it
     event TreeDistribution(
