@@ -99,9 +99,11 @@ def test_claim_convex_single_bribe(upgraded_strat, bribes_receiver, real_strateg
 
     balance_for_receiver = spell_token.balanceOf(bribes_receiver)
 
-    upgraded_strat.claimBribeFromConvex(spell_token, {"from": real_strategist})
+    claim_tx = upgraded_strat.claimBribeFromConvex(spell_token, {"from": real_strategist})
 
     assert spell_token.balanceOf(bribes_receiver) > balance_for_receiver
+
+    assert claim_tx.events["RewardsCollected"]["amount"] > 0
 
 def test_claim_convex_bulk_bribes(upgraded_strat, bribes_receiver, real_strategist):
 
@@ -113,7 +115,7 @@ def test_claim_convex_bulk_bribes(upgraded_strat, bribes_receiver, real_strategi
     balance_for_receiver_alcx = alcx_token.balanceOf(bribes_receiver)
     balance_for_receiver_neutrino = neutrino_token.balanceOf(bribes_receiver)
 
-    upgraded_strat.claimBribesFromConvex(
+    claim_tx = upgraded_strat.claimBribesFromConvex(
         [spell_token, alcx_token, neutrino_token],
         {"from": real_strategist}
     )
@@ -122,26 +124,28 @@ def test_claim_convex_bulk_bribes(upgraded_strat, bribes_receiver, real_strategi
     assert alcx_token.balanceOf(bribes_receiver) > balance_for_receiver_alcx
     assert neutrino_token.balanceOf(bribes_receiver) > balance_for_receiver_neutrino
 
+    assert claim_tx.events["RewardsCollected"][0]["amount"] > 0
+
 
 """
 NOTE: This will work only this week / until we push to live
 See here for how data was found
 https://github.com/oo-00/Votium/blob/e5053b45fcf3d0fa346721b758c5e97cf34cc3ec/merkle/BADGER/0002.json#L1220
 """
-
+## NOTE: This data has to change every week as votium rewrites the merkleProof
 TOKEN = "0x3472A5A71965499acd81997a54BBA8D852C6E53d"
-INDEX = 83
-AMOUNT = "0x0de0b6b3a7640000"
+INDEX = 162
+AMOUNT = "0x6e93cdf19e6ff80000"
 PROOF = [
-        "0x1ae90fdb6127c7cf8c74de3c489e1218c8bc2efa9dba0d4ae127dcf85720e9f9",
-        "0xea0778bf8d17dbe3347e22be9e1976d7ad265c5a3697fa2407d6d5dbd4ec1106",
-        "0xe1e41af76373b4975609907edb2e8fb704db3bbd34a3630b3f2e806beae9b077",
-        "0x0d08fa29561fd186c02a8344409720554295bcf196a7618bf26eb7f5cda5e5db",
-        "0x227c98a62447a59091fddef2cb18be1b1d381b9c344569c2031b6f0f5ed1d3fd",
-        "0xe79d45d570f91255ba88ed5adfee28fc93f2e5a040d438ea5476c495201e09b8",
-        "0x989737ec30786bae1b514674726b55ec394fcdbe436d25cf65bfc9dcea9c8a57",
-        "0xcedf99c49cbb5c38f212f3b9a0939674f2d4368319f6aa9edf999da744a60855",
-        "0x1c4a767629e88473b4c73edf6525b0dfde8280d7b5825c8f22c1222a8be13084"
+        "0xe8b54c8216d6f973dc307be5d8771c6661161027dc3f503d00d41cc431736101",
+        "0xe042cd20124dcb2cd73b5fa7faadbf2d7ed2e29228ef7e3d4513a5973472710c",
+        "0x2c8a3f30a5f990eeba265716db15b8b32daa0ee9adee0107a29935ddecd29a00",
+        "0x25163cf588e80f1869bc70424f9d2abcf944425bce504a45df0f634c1dbefbea",
+        "0xc1e5c473eae360a8fe2ec5da321886a476aa8a181898856c88c3569f5809cf5d",
+        "0x05978f187ee596396fb5c1aa5686f746bb4f87ee2ab3e717f03199f9b117a316",
+        "0x4ab42f1938ae314b376fcaa55458619bb10695eddc366cf5f47cd5c1a7e311f8",
+        "0x5ac451a9ea055a61c0b88482f911dd6bd5ad2b0440cea4bef3363aa0eaa43eef",
+        "0x547e5952ac85e0559a8c01bd70547a0614930c0c61f7d6452fe956b7a9183232"
       ]
 
 def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):

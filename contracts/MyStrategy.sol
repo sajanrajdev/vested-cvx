@@ -75,6 +75,10 @@ contract MyStrategy is BaseStrategy {
         uint256 indexed blockNumber,
         uint256 timestamp
     );
+    event RewardsCollected(
+        address token,
+        uint256 amount
+    );
     event PerformanceFeeGovernance(
         address indexed destination,
         address indexed token,
@@ -275,6 +279,7 @@ contract MyStrategy is BaseStrategy {
         // Send reward to Multisig
         uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
         IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
+        emit RewardsCollected(token, toSend);
     }
 
     /// @dev Send the BADGER token to the badgerTree
