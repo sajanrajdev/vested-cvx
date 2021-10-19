@@ -34,6 +34,7 @@ def test_deposit_withdraw_single_user_flow(
     chain.sleep(86400 * 250)  ## Wait 250 days so we can withdraw later
     chain.mine(1)
 
+    strategy.setProcessLocksOnRebalance(True, {"from": deployed.governance})
     strategy.manualRebalance(0, {"from": deployed.governance})
 
     snap.settWithdraw(shares // 2, {"from": deployer})
@@ -101,7 +102,8 @@ def test_single_user_harvest_flow(
 
     if tendable:
         snap.settTend({"from": strategyKeeper})
-
+        
+    strategy.setProcessLocksOnRebalance(True, {"from": deployed.governance})
     strategy.manualRebalance(0, {"from": deployed.governance}) 
     ## Any harvest after here will not produce any rewards
     ## We have unlocked everything

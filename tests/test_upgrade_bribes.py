@@ -68,6 +68,13 @@ def upgraded_strat(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_a
 @pytest.fixture
 def bribes_receiver(upgraded_strat):
     return upgraded_strat.BRIBES_RECEIVER()
+@pytest.fixture
+def badger_tree(upgraded_strat):
+    return upgraded_strat.BADGER_TREE()
+
+@pytest.fixture
+def bribes_receiver(upgraded_strat):
+    return upgraded_strat.BRIBES_RECEIVER()
 
 @pytest.fixture
 def real_strategist(upgraded_strat):
@@ -137,11 +144,12 @@ PROOF = [
         "0x1c4a767629e88473b4c73edf6525b0dfde8280d7b5825c8f22c1222a8be13084"
       ]
 
-def test_claim_votium_bribes(upgraded_strat, bribes_receiver, real_strategist):
+def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):
   badger_token = ERC20Upgradeable.at(TOKEN)
-  balance_for_receiver_badger = badger_token.balanceOf(bribes_receiver)
+  badger_tree = upgraded_strat.BADGER_TREE()
+  balance_for_tree = badger_token.balanceOf(badger_tree)
 
-  upgraded_strat.claimBribeFromVotium(
+  claim_tx = upgraded_strat.claimBribeFromVotium(
     TOKEN,
     INDEX,
     upgraded_strat,
@@ -150,13 +158,18 @@ def test_claim_votium_bribes(upgraded_strat, bribes_receiver, real_strategist):
     {"from": real_strategist}
   )
 
-  assert badger_token.balanceOf(bribes_receiver) > balance_for_receiver_badger
 
-def test_bulk_claim_votium_bribes(upgraded_strat, bribes_receiver, real_strategist):
+  ## NOTE: Since it's BADGER we check balance on the tree and the event being emitted
+  assert badger_token.balanceOf(badger_tree) > balance_for_tree
+
+  assert claim_tx.events["TreeDistribution"]["token"] == badger_token
+  assert claim_tx.events["TreeDistribution"]["amount"] >= 0
+
+def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):
   badger_token = ERC20Upgradeable.at(TOKEN)
-  balance_for_receiver_badger = badger_token.balanceOf(bribes_receiver)
+  balance_for_tree = badger_token.balanceOf(badger_tree)
 
-  upgraded_strat.claimBribesFromVotium(
+  claim_tx = upgraded_strat.claimBribesFromVotium(
     upgraded_strat,
     [TOKEN],
     [INDEX],
@@ -165,4 +178,7 @@ def test_bulk_claim_votium_bribes(upgraded_strat, bribes_receiver, real_strategi
     {"from": real_strategist}
   )
 
-  assert badger_token.balanceOf(bribes_receiver) > balance_for_receiver_badger
+  assert badger_token.balanceOf(badger_tree) > balance_for_tree
+
+  assert claim_tx.events["TreeDistribution"]["token"] == badger_token
+  assert claim_tx.events["TreeDistribution"]["amount"] >= 0
