@@ -21,7 +21,8 @@ import {BaseStrategy} from "../deps/BaseStrategy.sol";
 /**
  * CHANGELOG
  * V1.0 Initial Release, can lock
- * V1.1 Update to handle bribes which are sent to a multisig
+ * V1.1 Update to handle rewards which are sent to a multisig
+ * V1.2 Update to emit badger, all other rewards are sent to multisig
  */
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
