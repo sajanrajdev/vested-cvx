@@ -162,12 +162,6 @@ contract MyStrategy is BaseStrategy {
         processLocksOnRebalance = newProcessLocksOnRebalance;
     }
 
-    function _sendBadgerToTree() internal {
-        uint256 badgerSent = IERC20Upgradeable(BADGER).balanceOf(address(this));
-        IERC20Upgradeable(BADGER).safeTransfer(BADGER_TREE, badgerSent);
-        emit TreeDistribution(BADGER, badgerSent, block.number, block.timestamp);
-    }
-
     /// *** Bribe Claiming ***
     /// @dev given a token address, claim that as reward from CVX Extra Rewards
     /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
@@ -182,14 +176,7 @@ contract MyStrategy is BaseStrategy {
         // Claim reward for token
         CVX_EXTRA_REWARDS.getReward(address(this), token);
 
-        // NOTE: BADGER is emitted through the tree
-        if (token == BADGER){
-            _sendBadgerToTree();
-        } else {
-            // Send reward to Multisig
-            uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
-            IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
-        }
+        _handleRewardTransfer(token);
     }
 
     /// @dev given a list of token addresses, claim that as reward from CVX Extra Rewards
@@ -210,15 +197,13 @@ contract MyStrategy is BaseStrategy {
 
         // Send reward to Multisig
         for(uint x = 0; x < length; x++){
-            if(tokens[x] == BADGER){
-                _sendBadgerToTree();
-            } else {
-                uint256 toSend = IERC20Upgradeable(tokens[x]).balanceOf(address(this));
-                IERC20Upgradeable(tokens[x]).safeTransfer(BRIBES_RECEIVER, toSend);
-            }
+            _handleRewardTransfer(tokens[x]);
         }
     }
 
+    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
+    /// @dev allows claiming of rewards, badger is sent to tree
+    /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribeFromVotium(
         address token, 
         uint256 index, 
@@ -233,15 +218,12 @@ contract MyStrategy is BaseStrategy {
         // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
 
         VOTIUM_BRIBE_CLAIMER.claim(token, index, account, amount, merkleProof);
-        if (token == BADGER){
-            _sendBadgerToTree();
-        } else {
-            // Send reward to Multisig
-            uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
-            IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
-        }
-    }
 
+        _handleRewardTransfer(token);
+    }
+    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
+    /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
+    /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribesFromVotium(
         address account, 
         address[] calldata tokens, 
@@ -273,13 +255,33 @@ contract MyStrategy is BaseStrategy {
         VOTIUM_BRIBE_CLAIMER.claimMulti(account, request);
 
         for(uint x = 0; x < length; x++){
-            if(tokens[x] == BADGER){
-                _sendBadgerToTree();
-            } else {
-                uint256 toSend = IERC20Upgradeable(tokens[x]).balanceOf(address(this));
-                IERC20Upgradeable(tokens[x]).safeTransfer(BRIBES_RECEIVER, toSend);
-            }
+            _handleRewardTransfer(tokens[x]);
         }
+    }
+
+    /// *** Handling of rewards ***
+    function _handleRewardTransfer(address token) internal {
+        // NOTE: BADGER is emitted through the tree
+        if (token == BADGER){
+            _sendBadgerToTree();
+        } else {
+        // NOTE: All other tokens are sent to multisig
+            _sentTokenToBribesReceiver(token);
+        }
+    }
+
+    /// @dev Send funds to the bribes receiver
+    function _sentTokenToBribesReceiver(address token) internal {
+        // Send reward to Multisig
+        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
+        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
+    }
+
+    /// @dev Send the BADGER token to the badgerTree
+    function _sendBadgerToTree() internal {
+        uint256 badgerSent = IERC20Upgradeable(BADGER).balanceOf(address(this));
+        IERC20Upgradeable(BADGER).safeTransfer(BADGER_TREE, badgerSent);
+        emit TreeDistribution(BADGER, badgerSent, block.number, block.timestamp);
     }
 
     /// ===== View Functions =====
