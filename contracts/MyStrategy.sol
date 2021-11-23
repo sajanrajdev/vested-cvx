@@ -23,6 +23,7 @@ import {BaseStrategy} from "../deps/BaseStrategy.sol";
  * V1.0 Initial Release, can lock
  * V1.1 Update to handle rewards which are sent to a multisig
  * V1.2 Update to emit badger, all other rewards are sent to multisig
+ * V1.3 Updated Address to claim CVX Rewards
  */
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -53,7 +54,7 @@ contract MyStrategy is BaseStrategy {
     // NOTE: At time of publishing, this contract is under audit
     ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
 
-    ICVXBribes public constant CVX_EXTRA_REWARDS = ICVXBribes(0x8Ed4bbf39E3080b35DA84a13A0D1A2FDcE1e0602);
+    ICVXBribes public constant CVX_EXTRA_REWARDS = ICVXBribes(0xDecc7d761496d30F30b92Bdf764fb8803c79360D);
     IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);
     
     // We hardcode, an upgrade is required to change this as it's a meaningful change
@@ -304,7 +305,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.1";
+        return "1.3";
     }
 
     /// @dev Balance of want currently held in strategy positions

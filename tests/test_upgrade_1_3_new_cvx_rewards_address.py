@@ -8,6 +8,7 @@ from brownie import (
     Contract
 )
 import brownie
+from brownie.network.account import Account
 from config import (
     BADGER_DEV_MULTISIG,
     WANT,
@@ -21,8 +22,9 @@ import pytest
 
 
 """
-Tests for the Upgrade from mainnet version to upgraded version
+Tests for the Bribes functonality, to be run after upgrades
 These tests must be run on mainnet-fork
+On separate file to avoid wasting time
 """
 
 SETT_ADDRESS = "0xfd05D3C7fe2924020620A8bE4961bBaA747e6305"
@@ -50,7 +52,6 @@ def proxy_admin():
     """
     return Contract.from_explorer("0x20dce41acca85e8222d6861aa6d23b6c941777bf")
 
-
 @pytest.fixture
 def proxy_admin_gov():
     """
@@ -58,16 +59,25 @@ def proxy_admin_gov():
     """
     return accounts.at("0x21cf9b77f88adf8f8c98d7e33fe601dc57bc0893", force=True)
 
+@pytest.fixture
+def real_strategist(strat_proxy):
+    return accounts.at(strat_proxy.strategist(), force=True)
 
-def test_upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov):
+## Forces reset before each test
+@pytest.fixture(autouse=True)
+def isolation(fn_isolation):
+    pass
+
+
+def test_upgrade_harvest_and_claim_cvx(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov, real_strategist):
+    """
+        Test for the 1.3 upgrade, checks that we can upgrade and we receive new CVX reward from the new contract
+    """
     new_strat_logic = MyStrategy.deploy({"from": deployer})
+
+    bribes_receiver = strat_proxy.BRIBES_RECEIVER()
     
-    with brownie.reverts():
-        strat_proxy.CVX_EXTRA_REWARDS()
-    with brownie.reverts():
-        strat_proxy.VOTIUM_BRIBE_CLAIMER()
-    with brownie.reverts():
-        strat_proxy.BRIBES_RECEIVER()
+    assert strat_proxy.CVX_EXTRA_REWARDS() == "0x8Ed4bbf39E3080b35DA84a13A0D1A2FDcE1e0602"
 
     ## Setting all variables, we'll use them later
     prev_strategist = strat_proxy.strategist()
@@ -89,7 +99,6 @@ def test_upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_prox
 
     gov = accounts.at(strat_proxy.governance(), force=True)
 
-
     ## Checking all variables are as expected
     assert prev_strategist == strat_proxy.strategist()
     assert prev_gov == strat_proxy.governance()
@@ -108,7 +117,7 @@ def test_upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_prox
 
     ## Verify new Addresses are setup properly
     assert strat_proxy.LOCKER() == "0xD18140b4B819b895A3dba5442F959fA44994AF50"
-    assert strat_proxy.CVX_EXTRA_REWARDS() == "0x8Ed4bbf39E3080b35DA84a13A0D1A2FDcE1e0602"
+    assert strat_proxy.CVX_EXTRA_REWARDS() == "0xDecc7d761496d30F30b92Bdf764fb8803c79360D"
     assert strat_proxy.VOTIUM_BRIBE_CLAIMER() == "0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A"
     assert strat_proxy.BRIBES_RECEIVER() == "0x6F76C6A1059093E21D8B1C13C4e20D8335e2909F"
 
@@ -120,7 +129,28 @@ def test_upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_prox
     with brownie.reverts("You have to wait for unlock or have to manually rebalance out of it"):
         ## Withdraw All successfully fails as we are locked
         controller_proxy.withdrawAll(vault_proxy.token(), {"from": accounts.at(controller_proxy.governance(), force=True)})
+    
     vault_proxy.earn({"from": gov})
 
-    ## Harvest should work
     strat_proxy.harvest({"from": gov})
+
+    ## Claim Rewards
+    spell_token = ERC20Upgradeable.at("0x090185f2135308bad17527004364ebcc2d37e5f6")
+    alcx_token = ERC20Upgradeable.at("0xdbdb4d16eda451d0503b854cf79d55697f90c8df")
+    neutrino_token = ERC20Upgradeable.at("0x9D79d5B61De59D882ce90125b18F74af650acB93")
+
+    balance_for_receiver_spell = spell_token.balanceOf(bribes_receiver)
+    balance_for_receiver_alcx = alcx_token.balanceOf(bribes_receiver)
+    balance_for_receiver_neutrino = neutrino_token.balanceOf(bribes_receiver)
+
+    claim_tx = strat_proxy.claimBribesFromConvex(
+        [spell_token, alcx_token, neutrino_token],
+        {"from": real_strategist}
+    )
+
+    assert spell_token.balanceOf(bribes_receiver) > balance_for_receiver_spell
+    ## NOTE: These 2 tokens will not increase as it seems like we're only entitled to spell bribes
+    assert alcx_token.balanceOf(bribes_receiver) >= balance_for_receiver_alcx
+    assert neutrino_token.balanceOf(bribes_receiver) >= balance_for_receiver_neutrino
+
+    assert claim_tx.events["RewardsCollected"][0]["amount"] > 0
