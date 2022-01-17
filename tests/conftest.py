@@ -43,7 +43,7 @@ def deployed():
     controller = Controller.deploy({"from": deployer})
     controller.initialize(BADGER_DEV_MULTISIG, strategist, keeper, BADGER_DEV_MULTISIG)
 
-    sett = SettV3.deploy({"from": deployer})
+    sett = SettV4.deploy({"from": deployer})
     sett.initialize(
         WANT,
         controller,
@@ -90,18 +90,12 @@ def deployed():
     controller.setStrategy(WANT, strategy, {"from": deployer})
 
     ## Send from a whale of CVX
-    whale = accounts.at("0x660802Fc641b154aBA66a62137e71f331B6d787A", force=True)
+    whale = accounts.at("0x5F465e9fcfFc217c5849906216581a657cd60605", force=True)
     want.transfer(a[0], 10000 * 10 ** 18, {"from": whale})  ## 10k
 
     ## NOTE: THIS HAS TO BE DONE IN SETUP JUST FOR THIS STRAT
-    ## Approve the Strat for bCVX
-    cvxVault = SettV3.at(want)
-    gov = accounts.at(sett.governance(), force=True)
-    cvxVault.approveContractAccess(strategy, {"from": gov})
-
-    ## NOTE: THIS HAS TO BE DONE IN SETUP JUST FOR THIS STRAT
     ## Approve the Strat for bcrvCVX
-    cvxCRVVault = SettV3.at(strategy.CVXCRV_VAULT())
+    cvxCRVVault = SettV4.at(strategy.CVXCRV_VAULT())
     gov = accounts.at(sett.governance(), force=True)
     cvxCRVVault.approveContractAccess(strategy, {"from": gov})
 
@@ -110,7 +104,6 @@ def deployed():
         controller=controller,
         vault=sett,
         sett=sett,
-        cvxVault=cvxVault,
         cvxCRVVault=cvxCRVVault,
         strategy=strategy,
         governance=governance,

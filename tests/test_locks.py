@@ -14,7 +14,8 @@ def test_wait_for_all_locks_can_withdraw_easy_after_manual_rebalance(
 
     ## Wait to unlock
     chain.sleep(86400 * 250)  # 250 days so lock expires
-
+    strategy.setProcessLocksOnRebalance(True, {"from": deployed.governance})
+    
     strategy.manualRebalance(0, {"from": deployed.governance})
 
     ## Try to withdraw all
