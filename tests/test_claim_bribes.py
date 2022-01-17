@@ -46,7 +46,7 @@ def strat_proxy():
 @pytest.fixture
 def proxy_admin():
     """
-     Verify by doing web3.eth.getStorageAt("STRAT_ADDRESS", int(
+    Verify by doing web3.eth.getStorageAt("STRAT_ADDRESS", int(
         0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
     )).hex()
     """
@@ -106,23 +106,20 @@ def test_claim_convex_single_bribe(upgraded_strat, bribes_receiver, real_strateg
     assert claim_tx.events["RewardsCollected"]["amount"] > 0
 
 def test_claim_convex_bulk_bribes(upgraded_strat, bribes_receiver, real_strategist):
+    """
+        Note: We only claim spell because rest of tokens claimableRewards is 0
+    """
 
     spell_token = ERC20Upgradeable.at("0x090185f2135308bad17527004364ebcc2d37e5f6")
-    alcx_token = ERC20Upgradeable.at("0xdbdb4d16eda451d0503b854cf79d55697f90c8df")
-    neutrino_token = ERC20Upgradeable.at("0x9D79d5B61De59D882ce90125b18F74af650acB93")
 
     balance_for_receiver_spell = spell_token.balanceOf(bribes_receiver)
-    balance_for_receiver_alcx = alcx_token.balanceOf(bribes_receiver)
-    balance_for_receiver_neutrino = neutrino_token.balanceOf(bribes_receiver)
 
     claim_tx = upgraded_strat.claimBribesFromConvex(
-        [spell_token, alcx_token, neutrino_token],
+        [spell_token],
         {"from": real_strategist}
     )
 
     assert spell_token.balanceOf(bribes_receiver) > balance_for_receiver_spell
-    assert alcx_token.balanceOf(bribes_receiver) > balance_for_receiver_alcx
-    assert neutrino_token.balanceOf(bribes_receiver) > balance_for_receiver_neutrino
 
     assert claim_tx.events["RewardsCollected"][0]["amount"] > 0
 
@@ -133,25 +130,26 @@ See here for how data was found
 https://github.com/oo-00/Votium/blob/e5053b45fcf3d0fa346721b758c5e97cf34cc3ec/merkle/BADGER/0002.json#L1220
 """
 ## NOTE: This data has to change every week as votium rewrites the merkleProof
-TOKEN = "0x3472A5A71965499acd81997a54BBA8D852C6E53d"
-INDEX = 162
-AMOUNT = "0x6e93cdf19e6ff80000"
+TOKEN = "0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B"
+INDEX = 684
+AMOUNT = "0x6e4a3cd203a5a40000"
 PROOF = [
-        "0xe8b54c8216d6f973dc307be5d8771c6661161027dc3f503d00d41cc431736101",
-        "0xe042cd20124dcb2cd73b5fa7faadbf2d7ed2e29228ef7e3d4513a5973472710c",
-        "0x2c8a3f30a5f990eeba265716db15b8b32daa0ee9adee0107a29935ddecd29a00",
-        "0x25163cf588e80f1869bc70424f9d2abcf944425bce504a45df0f634c1dbefbea",
-        "0xc1e5c473eae360a8fe2ec5da321886a476aa8a181898856c88c3569f5809cf5d",
-        "0x05978f187ee596396fb5c1aa5686f746bb4f87ee2ab3e717f03199f9b117a316",
-        "0x4ab42f1938ae314b376fcaa55458619bb10695eddc366cf5f47cd5c1a7e311f8",
-        "0x5ac451a9ea055a61c0b88482f911dd6bd5ad2b0440cea4bef3363aa0eaa43eef",
-        "0x547e5952ac85e0559a8c01bd70547a0614930c0c61f7d6452fe956b7a9183232"
-      ]
+    "0xde24992959a35e41f92dc070000fb59ade0b47f2399b2cbe7ec0126accc9f832",
+    "0xe965287182073f2db7f8507458c9a1e168200f7973c155f5432e49dc51d80ed2",
+    "0x53fba95706bb8bcfeb337fffb943c4ea708425185e2931139fdfe0e3f96ae49a",
+    "0x9817ff39ca612d9b62f61f8e266df6a8d67b5406e339be58dd832e324851479e",
+    "0x9fc0b7dc83afc55158b60d5709091348c4bc6f9a5263af5d42c5e70437a6db9e",
+    "0xcbff70570ca71e83dbd2bdbd254c916a629092a73fd148675f55fdfb1ae85c4d",
+    "0x0f53cd12926a48df89913df901b24def5d7b74f90b1e862f0103b575fcb7b0d2",
+    "0x78266a424a8faf8964c0ad8ef984a56bb23daa585ce45ce549c72891f67c5619",
+    "0x0395908c13baf6cf4dfb9ddba61bc7e02567fc186a4f8243ac970af4c290c634",
+    "0x93fe0d6bdabadd863667aaa36cdbd1c48483b71ef903088ac2fca69964f1291e",
+    "0x92313245368194a1e13309d50a3b382ea5185547fddd2651159a85936c8a7182"
+]
 
-def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):
-  badger_token = ERC20Upgradeable.at(TOKEN)
-  badger_tree = upgraded_strat.BADGER_TREE()
-  balance_for_tree = badger_token.balanceOf(badger_tree)
+def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
+  cvx_token = ERC20Upgradeable.at(TOKEN)
+  balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
   claim_tx = upgraded_strat.claimBribeFromVotium(
     TOKEN,
@@ -164,14 +162,14 @@ def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):
 
 
   ## NOTE: Since it's BADGER we check balance on the tree and the event being emitted
-  assert badger_token.balanceOf(badger_tree) > balance_for_tree
+  assert cvx_token.balanceOf(bribes_receiver) > balance_for_receiver_cvx
 
-  assert claim_tx.events["TreeDistribution"]["token"] == badger_token
-  assert claim_tx.events["TreeDistribution"]["amount"] >= 0
+  assert claim_tx.events["RewardsCollected"]["token"] == cvx_token
+  assert claim_tx.events["RewardsCollected"]["amount"] >= 0
 
-def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):
-  badger_token = ERC20Upgradeable.at(TOKEN)
-  balance_for_tree = badger_token.balanceOf(badger_tree)
+def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
+  cvx_token = ERC20Upgradeable.at(TOKEN)
+  balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
   claim_tx = upgraded_strat.claimBribesFromVotium(
     upgraded_strat,
@@ -182,7 +180,7 @@ def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist):
     {"from": real_strategist}
   )
 
-  assert badger_token.balanceOf(badger_tree) > balance_for_tree
+  assert cvx_token.balanceOf(bribes_receiver) > balance_for_receiver_cvx
 
-  assert claim_tx.events["TreeDistribution"]["token"] == badger_token
-  assert claim_tx.events["TreeDistribution"]["amount"] >= 0
+  assert claim_tx.events["RewardsCollected"]["token"] == cvx_token
+  assert claim_tx.events["RewardsCollected"]["amount"] >= 0

@@ -69,8 +69,9 @@ def isolation(fn_isolation):
     pass
 
 
-def test_upgrade_harvest_and_claim_cvx(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov, real_strategist):
+def upgrade_harvest_and_claim_cvx(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov, real_strategist):
     """
+        OLD
         Test for the 1.3 upgrade, checks that we can upgrade and we receive new CVX reward from the new contract
     """
     new_strat_logic = MyStrategy.deploy({"from": deployer})
@@ -136,21 +137,21 @@ def test_upgrade_harvest_and_claim_cvx(vault_proxy, controller_proxy, deployer, 
 
     ## Claim Rewards
     spell_token = ERC20Upgradeable.at("0x090185f2135308bad17527004364ebcc2d37e5f6")
-    alcx_token = ERC20Upgradeable.at("0xdbdb4d16eda451d0503b854cf79d55697f90c8df")
-    neutrino_token = ERC20Upgradeable.at("0x9D79d5B61De59D882ce90125b18F74af650acB93")
+    badger_token = ERC20Upgradeable.at("0x3472A5A71965499acd81997a54BBA8D852C6E53d")
+    meta_token = ERC20Upgradeable.at("0xa3BeD4E1c75D00fa6f4E5E6922DB7261B5E9AcD2")
 
     balance_for_receiver_spell = spell_token.balanceOf(bribes_receiver)
-    balance_for_receiver_alcx = alcx_token.balanceOf(bribes_receiver)
-    balance_for_receiver_neutrino = neutrino_token.balanceOf(bribes_receiver)
+    balance_for_receiver_badger = badger_token.balanceOf(bribes_receiver)
+    balance_for_receiver_meta = meta_token.balanceOf(bribes_receiver)
 
     claim_tx = strat_proxy.claimBribesFromConvex(
-        [spell_token, alcx_token, neutrino_token],
+        [spell_token, badger_token, meta_token],
         {"from": real_strategist}
     )
 
     assert spell_token.balanceOf(bribes_receiver) > balance_for_receiver_spell
     ## NOTE: These 2 tokens will not increase as it seems like we're only entitled to spell bribes
-    assert alcx_token.balanceOf(bribes_receiver) >= balance_for_receiver_alcx
-    assert neutrino_token.balanceOf(bribes_receiver) >= balance_for_receiver_neutrino
+    assert badger_token.balanceOf(bribes_receiver) > balance_for_receiver_badger
+    assert meta_token.balanceOf(bribes_receiver) > balance_for_receiver_meta
 
     assert claim_tx.events["RewardsCollected"][0]["amount"] > 0

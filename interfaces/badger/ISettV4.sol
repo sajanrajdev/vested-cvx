@@ -8,10 +8,12 @@ interface ISettV4 {
 
     function depositFor(address _recipient, uint256 _amount) external;
 
-
     function withdraw(uint256 _amount) external;
+
+    function balance() external view returns (uint256);
 
     function getPricePerFullShare() external view returns (uint256);
 
     function balanceOf(address) external view returns (uint256);
+    
 }

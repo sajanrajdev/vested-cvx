@@ -24,6 +24,7 @@ import {BaseStrategy} from "../deps/BaseStrategy.sol";
  * V1.1 Update to handle rewards which are sent to a multisig
  * V1.2 Update to emit badger, all other rewards are sent to multisig
  * V1.3 Updated Address to claim CVX Rewards
+ * V1.4 Updated Claiming mechanism to allow claiming any token (using difference in balances)
  */
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -173,15 +174,16 @@ contract MyStrategy is BaseStrategy {
     /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribeFromConvex (address token) external {
         _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
 
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        _onlyNotProtectedTokens(token);
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
+        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
         // Claim reward for token
         CVX_EXTRA_REWARDS.getReward(address(this), token);
+        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
 
-        _handleRewardTransfer(token);
+        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
     }
 
     /// @dev given a list of token addresses, claim that as reward from CVX Extra Rewards
@@ -189,11 +191,14 @@ contract MyStrategy is BaseStrategy {
     /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribesFromConvex(address[] calldata tokens) external {
         _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
+        // Also checks balance diff
         uint256 length = tokens.length;
+        uint256[] memory beforeBalance = new uint256[](length);
         for(uint i = 0; i < length; i++){
-            _onlyNotProtectedTokens(tokens[i]);
+            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
         }
         // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
 
@@ -202,8 +207,10 @@ contract MyStrategy is BaseStrategy {
 
         // Send reward to Multisig
         for(uint x = 0; x < length; x++){
-            _handleRewardTransfer(tokens[x]);
+            _handleRewardTransfer(tokens[x], IERC20Upgradeable(tokens[x]).balanceOf(address(this)).sub(beforeBalance[x]));
         }
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
     }
 
     /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
@@ -217,14 +224,18 @@ contract MyStrategy is BaseStrategy {
         bytes32[] calldata merkleProof
     ) external {
         _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
-        _onlyNotProtectedTokens(token);
         // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
 
+        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
         VOTIUM_BRIBE_CLAIMER.claim(token, index, account, amount, merkleProof);
+        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
 
-        _handleRewardTransfer(token);
+        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
     }
     /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
     /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
@@ -237,18 +248,19 @@ contract MyStrategy is BaseStrategy {
         bytes32[][] calldata merkleProofs
     ) external {
         _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
-        uint256 length = tokens.length;
-        require(length == indexes.length && length == amounts.length && length == merkleProofs.length, "Length Mismatch");
-
-        for(uint i = 0; i < length; i++){
-            _onlyNotProtectedTokens(tokens[i]);
+        require(tokens.length == indexes.length && tokens.length == amounts.length && tokens.length == merkleProofs.length, "Length Mismatch");
+        // tokens.length = length, can't declare var as stack too deep
+        uint256[] memory beforeBalance = new uint256[](tokens.length);
+        for(uint i = 0; i < tokens.length; i++){
+            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
         }
         // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
 
-        IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](length);
-        for(uint x = 0; x < length; x++){
+        IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](tokens.length);
+        for(uint x = 0; x < tokens.length; x++){
             request[x] = IVotiumBribes.claimParam({
                 token: tokens[x],
                 index: indexes[x],
@@ -259,35 +271,41 @@ contract MyStrategy is BaseStrategy {
 
         VOTIUM_BRIBE_CLAIMER.claimMulti(account, request);
 
-        for(uint x = 0; x < length; x++){
-            _handleRewardTransfer(tokens[x]);
+        for(uint i = 0; i < tokens.length; i++){
+            _handleRewardTransfer(tokens[i], IERC20Upgradeable(tokens[i]).balanceOf(address(this)).sub(beforeBalance[i]));
         }
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
     }
 
     /// *** Handling of rewards ***
-    function _handleRewardTransfer(address token) internal {
+    function _handleRewardTransfer(address token, uint256 amount) internal {
         // NOTE: BADGER is emitted through the tree
         if (token == BADGER){
-            _sendBadgerToTree();
+            _sendBadgerToTree(amount);
         } else {
         // NOTE: All other tokens are sent to multisig
-            _sentTokenToBribesReceiver(token);
+            _sentTokenToBribesReceiver(token, amount);
         }
     }
 
     /// @dev Send funds to the bribes receiver
-    function _sentTokenToBribesReceiver(address token) internal {
-        // Send reward to Multisig
-        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
-        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, toSend);
-        emit RewardsCollected(token, toSend);
+    function _sentTokenToBribesReceiver(address token, uint256 amount) internal {
+        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, amount);
+        emit RewardsCollected(token, amount);
     }
 
     /// @dev Send the BADGER token to the badgerTree
-    function _sendBadgerToTree() internal {
-        uint256 badgerSent = IERC20Upgradeable(BADGER).balanceOf(address(this));
-        IERC20Upgradeable(BADGER).safeTransfer(BADGER_TREE, badgerSent);
-        emit TreeDistribution(BADGER, badgerSent, block.number, block.timestamp);
+    function _sendBadgerToTree(uint256 amount) internal {
+        IERC20Upgradeable(BADGER).safeTransfer(BADGER_TREE, amount);
+        emit TreeDistribution(BADGER, amount, block.number, block.timestamp);
+    }
+
+
+
+    function _getBalance() internal returns (uint256) {
+        ISettV4 vault = ISettV4(IController(controller).vaults(want));
+        return vault.balance();
     }
 
     /// ===== View Functions =====
@@ -305,7 +323,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.3";
+        return "1.4";
     }
 
     /// @dev Balance of want currently held in strategy positions

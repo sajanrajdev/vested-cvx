@@ -44,7 +44,7 @@ def strat_proxy():
 @pytest.fixture
 def proxy_admin():
     """
-     Verify by doing web3.eth.getStorageAt("STRAT_ADDRESS", int(
+    Verify by doing web3.eth.getStorageAt("STRAT_ADDRESS", int(
         0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
     )).hex()
     """
@@ -59,7 +59,10 @@ def proxy_admin_gov():
     return accounts.at("0x21cf9b77f88adf8f8c98d7e33fe601dc57bc0893", force=True)
 
 
-def test_upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov):
+def upgrade_and_harvest(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov):
+    """
+        Old code for v1.2, we skip
+    """
     new_strat_logic = MyStrategy.deploy({"from": deployer})
     
     with brownie.reverts():
