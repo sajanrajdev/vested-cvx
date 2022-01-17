@@ -173,7 +173,6 @@ contract MyStrategy is BaseStrategy {
     /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
     /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribeFromConvex (address token) external {
-        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
@@ -190,7 +189,6 @@ contract MyStrategy is BaseStrategy {
     /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
     /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribesFromConvex(address[] calldata tokens) external {
-        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
@@ -223,7 +221,6 @@ contract MyStrategy is BaseStrategy {
         uint256 amount, 
         bytes32[] calldata merkleProof
     ) external {
-        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
@@ -247,7 +244,6 @@ contract MyStrategy is BaseStrategy {
         uint256[] calldata amounts, 
         bytes32[][] calldata merkleProofs
     ) external {
-        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
