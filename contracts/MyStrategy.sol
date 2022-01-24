@@ -171,8 +171,8 @@ contract MyStrategy is BaseStrategy {
     /// *** Bribe Claiming ***
     /// @dev given a token address, claim that as reward from CVX Extra Rewards
     /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribeFromConvex (address token) external {
+        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
@@ -187,8 +187,8 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev given a list of token addresses, claim that as reward from CVX Extra Rewards
     /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribesFromConvex(address[] calldata tokens) external {
+        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
@@ -213,7 +213,6 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
     /// @dev allows claiming of rewards, badger is sent to tree
-    /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribeFromVotium(
         address token, 
         uint256 index, 
@@ -221,6 +220,7 @@ contract MyStrategy is BaseStrategy {
         uint256 amount, 
         bytes32[] calldata merkleProof
     ) external {
+        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
@@ -236,7 +236,6 @@ contract MyStrategy is BaseStrategy {
     }
     /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
     /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
-    /// @notice for security reasons, you can't claim a bribe for a protected token
     function claimBribesFromVotium(
         address account, 
         address[] calldata tokens, 
@@ -244,6 +243,7 @@ contract MyStrategy is BaseStrategy {
         uint256[] calldata amounts, 
         bytes32[][] calldata merkleProofs
     ) external {
+        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
 
         // Revert if you try to claim a protected token, this is to avoid rugging
@@ -297,8 +297,8 @@ contract MyStrategy is BaseStrategy {
         emit TreeDistribution(BADGER, amount, block.number, block.timestamp);
     }
 
-
-
+    /// @dev Get the current Vault.balance
+    /// @notice this is reflexive, a change in the strat will change the balance in the vault
     function _getBalance() internal returns (uint256) {
         ISettV4 vault = ISettV4(IController(controller).vaults(want));
         return vault.balance();
@@ -393,6 +393,10 @@ contract MyStrategy is BaseStrategy {
         returns (uint256)
     {
         uint256 max = IERC20Upgradeable(want).balanceOf(address(this));
+
+        if(_amount > max){
+            LOCKER.processExpiredLocks(false);
+        }
 
         if (withdrawalSafetyCheck) {
             require(

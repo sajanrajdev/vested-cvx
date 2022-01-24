@@ -188,24 +188,21 @@ def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, 
 
 
 def test_claim_bribes_random(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
-  cvx_token = ERC20Upgradeable.at(TOKEN)
-  balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
+    """
+        NOTE: We removed ability for randoms to call so this test checks for reverts
+    """
+    cvx_token = ERC20Upgradeable.at(TOKEN)
+    balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
-  rando = accounts[6]
-  balance_for_rando = cvx_token.balanceOf(rando)
-
-  claim_tx = upgraded_strat.claimBribesFromVotium(
-    upgraded_strat,
-    [TOKEN],
-    [INDEX],
-    [AMOUNT],
-    [PROOF],
-    {"from": accounts[6]}
-  )
-
-  assert cvx_token.balanceOf(bribes_receiver) > balance_for_receiver_cvx
-
-  assert claim_tx.events["RewardsCollected"]["token"] == cvx_token
-  assert claim_tx.events["RewardsCollected"]["amount"] >= 0
-
-  assert cvx_token.balanceOf(rando) == balance_for_rando ## They got nothing out of this
+    rando = accounts[6]
+    balance_for_rando = cvx_token.balanceOf(rando)
+        
+    with brownie.reverts():
+        claim_tx = upgraded_strat.claimBribesFromVotium(
+            upgraded_strat,
+            [TOKEN],
+            [INDEX],
+            [AMOUNT],
+            [PROOF],
+            {"from": accounts[6]}
+        )
