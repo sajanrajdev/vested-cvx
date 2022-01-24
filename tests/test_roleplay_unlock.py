@@ -33,25 +33,25 @@ def whale():
     """
         https://etherscan.io/token/0xfd05D3C7fe2924020620A8bE4961bBaA747e6305?a=0x53461e4fddcc1385f1256ae24ce3505be664f249
         Has about 200k tokens
-        First unlock is around 70k so they can't withdraw all but they can withdraw a bunch
+        Second unlock is around 200k so they can't withdraw all but they can withdraw a bunch
     """
     return accounts.at("0x53461e4fddcc1385f1256ae24ce3505be664f249", force=True)
 
 @pytest.fixture(autouse=True)
 def fish():
     """
-        https://etherscan.io/token/0xfd05D3C7fe2924020620A8bE4961bBaA747e6305?a=0x26fcbd3afebbe28d0a8684f790c48368d21665b5
+        https://etherscan.io/token/0xfd05D3C7fe2924020620A8bE4961bBaA747e6305?a=0xd50f649a2c9fd7ae88c223da80e985d71de45593
         Has about 20k tokens
-        First unlock is around 70k so they can just withdrawAll
+        Second unlock is around 200k so they can just withdrawAll
     """
-    return accounts.at("0x26fcbd3afebbe28d0a8684f790c48368d21665b5", force=True)
+    return accounts.at("0xd50f649a2c9fd7ae88c223da80e985d71de45593", force=True)
     
 
-KNOWN_UNLOCK_TIME = 1642636800 ## Change every time you need to make the experiment
+KNOWN_UNLOCK_TIME = 1643846400 ## Change every time you need to make the experiment
 
 LOCK_INDEX = 1 ## UNUSED, convenience
 
-EXPECTED_AMOUNT = 70758564549617397695572 ## Used to check we get the amount from lock
+EXPECTED_AMOUNT = 501132161317262692740431 ## Used to check we get the amount from lock
 ## just go to https://etherscan.io/address/0xd18140b4b819b895a3dba5442f959fa44994af50#readContract
 ## userLocks and get the amount and time to lock so you can run an accurate test each week / unlock period
 
@@ -87,17 +87,16 @@ def test_real_world_unlock(
     assert sett_proxy.getPricePerFullShare() == 1e18 ## no increase in ppfs, just unlock
 
     ## Whale can withdraw 10k shares here easily
-    sett_proxy.withdraw(modest_amount, {"from": whale}) ## Can't withdraw as not unlocked
+    sett_proxy.withdraw(modest_amount, {"from": whale})
 
     ## Then transfer to vault
     strat_proxy.manualSendCVXToVault({"from": governance})
 
     ## Whale can withdraw more shares as well
-    sett_proxy.withdraw(modest_amount, {"from": whale}) ## Can't withdraw as not unlocked
+    sett_proxy.withdraw(modest_amount, {"from": whale})
 
-    ## Because whale has still around 170k shares, they can't withdawAll still
-    with brownie.reverts("Withdrawal Safety Check"):
-        sett_proxy.withdrawAll({"from": whale})
+    ## Because whale has still around 170k shares, they can withdraw
+    sett_proxy.withdrawAll({"from": whale})
 
     ## Fish can withdraw all
     sett_proxy.withdrawAll({"from": fish})
