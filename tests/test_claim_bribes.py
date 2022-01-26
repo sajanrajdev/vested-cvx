@@ -187,7 +187,7 @@ def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, 
 
 
 
-def test_claim_bribes_random(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
+def test_random_cant_claim(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
     """
         NOTE: We removed ability for randoms to call so this test checks for reverts
     """
@@ -206,3 +206,49 @@ def test_claim_bribes_random(upgraded_strat, badger_tree, real_strategist, bribe
             [PROOF],
             {"from": accounts[6]}
         )
+
+RECIPIENT = "0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9"
+TOKEN = "0x090185f2135308bad17527004364ebcc2d37e5f6"
+INDEX = 701
+AMOUNT = "0x03329014ceb09a00000000"
+PROOF = [
+      "0x5a4981be6a1c84fd17cf5f0f4e00ba5567c3ac813d8a5fdf7dc60ce048483ff5",
+      "0x5c6093797cf0a804bf747bc9aae7c20f1206c37e4bee7df9d7102c5c4c02f5ef",
+      "0xe0e754041218abb7b52dcc0bf5d5b75dcba1be8e3ca81f8e009787a7ec0893f3",
+      "0x7e0c1a7b8e80e8939d272912f6cb2bbf3bb2b414d66331b4a73865e5d54b320f",
+      "0x80c883e31fc96a7c5656942d03ace3552896f99c73d5428a9be94fc32df17975",
+      "0x6064e5d02d3b2fb3860b362af1c555d62a0e07261b50f3e964d0c2bba2fe9b50",
+      "0xa79aeac5d41987c280948c631323a6b73ab80510c9d2a44ad9fa668c935545a9",
+      "0xa759fa153d807e4e2519ecf881d064276aa13ac823e8f02f06cbc0d028bf25a7",
+      "0x0ef4d7dcbca4db560498d6362633ad75ffd73e2cae850e37feeb1f2a8d58aa92",
+      "0xf8a2e6870a3d35dff77b1c1f2af4226e7fcdc486bae82517cf89bc4d88f96c3f",
+      "0xe2516c2950da5e6e28e774eac55653e40d7d435a539ea6c4fa9eff61d3d7e290",
+      "0x1cf4c12ecc23fd268dc8839358619c1c7bf3daeaaa60469e3e5d8a231515f218"
+    ]
+
+def test_if_griefed_we_can_sweep(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
+    """
+       People can grief by claiming for us, we can sweep to avoid probs
+       Only token that can get stuck is CVX, in that case it's gonna increase ppfs but be safe
+    """
+
+    merkle = interface.IVotiumBribes(upgraded_strat.VOTIUM_BRIBE_CLAIMER())
+
+    spell_token = ERC20Upgradeable.at(TOKEN)
+    balance_for_receiver = spell_token.balanceOf(bribes_receiver)
+
+    rando = accounts[6]
+    balance_for_rando = spell_token.balanceOf(rando)
+
+    balance_for_strategy = spell_token.balanceOf(upgraded_strat)
+
+    ## Rando claims spell token for strat, breaking the cliam flow
+    claim_tx = merkle.claim(spell_token, INDEX, RECIPIENT, AMOUNT, PROOF, {"from": rando})
+
+    assert spell_token.balanceOf(upgraded_strat) > balance_for_strategy
+
+    ## We "rescue" by using the sweep function
+    upgraded_strat.sweepRewards([spell_token], {"from": real_strategist})
+
+    assert spell_token.balanceOf(upgraded_strat) == 0 ## Spell has moved
+    assert spell_token.balanceOf(bribes_receiver) > balance_for_receiver ## Receiver got them

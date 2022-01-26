@@ -273,6 +273,25 @@ contract MyStrategy is BaseStrategy {
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
     }
+    
+    /// @dev Function to move rewards that are not protected
+    /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
+    /// @notice because token paths are harcoded, this function is safe to be called by anyone
+    function sweepRewardToken(address token) public {
+        _onlyGovernanceOrStrategist();
+        _onlyNotProtectedTokens(token);
+
+        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
+        _handleRewardTransfer(token, toSend);
+    }
+
+    /// @dev Bulk function for sweepRewardToken
+    function sweepRewards(address[] calldata tokens) external {
+        uint256 length = tokens.length;
+        for(uint i = 0; i < length; i++){
+            sweepRewardToken(tokens[i]);
+        }
+    }
 
     /// *** Handling of rewards ***
     function _handleRewardTransfer(address token, uint256 amount) internal {
@@ -392,11 +411,15 @@ contract MyStrategy is BaseStrategy {
         override
         returns (uint256)
     {
-        uint256 max = IERC20Upgradeable(want).balanceOf(address(this));
+        uint256 max = balanceOfWant();
 
         if(_amount > max){
+            // Try to unlock, as much as possible
+            // @notice Reverts if no locks expired
             LOCKER.processExpiredLocks(false);
+            max = balanceOfWant();
         }
+
 
         if (withdrawalSafetyCheck) {
             require(
@@ -405,7 +428,7 @@ contract MyStrategy is BaseStrategy {
             ); // 20 BP of slippage
         }
 
-        if (max < _amount) {
+        if (_amount > max) {
             return max;
         }
 
