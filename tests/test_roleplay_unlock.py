@@ -41,11 +41,12 @@ def whale():
 def fish():
     """
         https://etherscan.io/token/0xfd05D3C7fe2924020620A8bE4961bBaA747e6305?a=0xd50f649a2c9fd7ae88c223da80e985d71de45593
-        Has about 20k tokens
+        Has about 17k tokens
         Second unlock is around 200k so they can just withdrawAll
     """
     return accounts.at("0xd50f649a2c9fd7ae88c223da80e985d71de45593", force=True)
     
+## NOTE: use https://dune.xyz/tianqi/Convex-Locked-CVX to figure out unlocking schedule
 
 KNOWN_UNLOCK_TIME = 1643846400 ## Change every time you need to make the experiment
 
@@ -61,7 +62,7 @@ def test_real_world_unlock(
 
     initial_bal = want.balanceOf(strat_proxy)
 
-    modest_amount = 10e18 ## 10k CVX
+    modest_amount = 10_000e18 ## 10k CVX
 
     ## Can't withdraw all without unlocking
     with brownie.reverts("Withdrawal Safety Check"):

@@ -4,6 +4,24 @@ from brownie import *
 from helpers.constants import MaxUint256
 
 
+def test_withdraw_more_than_liquid_tries_to_unlock(
+    setup_strat, deployer, sett, strategy, want, locker, deployed
+):
+
+    ## Try to withdraw all, fail because locked
+    initial_dep = sett.balanceOf(deployer)
+
+    with brownie.reverts():
+        sett.withdraw(initial_dep, {"from": deployer})
+
+    can_withdraw = want.balanceOf(sett) + want.balanceOf(setup_strat)
+
+    with brownie.reverts():
+        sett.withdraw(can_withdraw + 100) ## Expect to fail as lock is not expired
+
+
+
+
 def test_wait_for_all_locks_can_withdraw_easy_after_manual_rebalance(
     setup_strat, deployer, sett, strategy, want, locker, deployed
 ):

@@ -11,12 +11,27 @@ from eth_utils import encode_hex
 """
 
 
-def test_if_not_wait_withdrawal_reverts(setup_strat, sett, deployer):
+def test_after_wait_withdrawSome_unlocks_for_caller(setup_strat, want, sett, deployer):
     ## Try to withdraw all, fail because locked
     initial_dep = sett.balanceOf(deployer)
 
     with brownie.reverts():
         sett.withdraw(initial_dep, {"from": deployer})
+
+    chain.sleep(86400 * 250)  # 250 days so lock expires
+
+    initial_b = want.balanceOf(deployer)
+
+    ## Not enough liquid balance    
+    assert want.balanceOf(sett) + want.balanceOf(setup_strat) < initial_dep
+
+    ## Yet we pull it off, because it unlocks for us
+    sett.withdraw(initial_dep, {"from": deployer}) ## Because we try to withdraw more than
+
+    assert want.balanceOf(deployer) > initial_b ## Want increased
+
+    ## More accurately
+    assert want.balanceOf(deployer) - initial_b >= (initial_dep * (10_000 - setup_strat.withdrawalFee()) / 10_000 - 1)
 
 
 def test_if_change_min_some_can_be_withdraw_easy(setup_strat, sett, deployer, want):
