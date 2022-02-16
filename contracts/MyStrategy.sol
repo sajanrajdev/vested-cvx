@@ -25,6 +25,7 @@ import {BaseStrategy} from "../deps/BaseStrategy.sol";
  * V1.2 Update to emit badger, all other rewards are sent to multisig
  * V1.3 Updated Address to claim CVX Rewards
  * V1.4 Updated Claiming mechanism to allow claiming any token (using difference in balances)
+ * V1.5 Unlocks are permissioneless, added Chainlink Keepeers integration
  */
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -338,7 +339,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.4";
+        return "1.5";
     }
 
     /// @dev Balance of want currently held in strategy positions
