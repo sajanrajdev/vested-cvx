@@ -17,16 +17,22 @@ def test_chainlink_checkUpkeep_works_when_a_lock_is_expired(setup_strat, want, s
     with brownie.reverts():
         sett.withdraw(initial_dep, {"from": deployer})
 
+    ## Random operation for ganache to wake up
+    want.approve(locker, 123, {"from": deployer})
+
     ## Nothing to unlock
     check = setup_strat.checkUpkeep(EmptyBytes32)
-    assert check.return_value[0] == False
+    assert check[0] == False
 
 
     chain.sleep(86400 * 250)  # 250 days so lock expires
 
+    ## Random operation for ganache to wake up
+    want.approve(locker, 123, {"from": deployer})
+
     ## Lock has expired, should return true
     check = setup_strat.checkUpkeep(EmptyBytes32)
-    assert check.return_value[0] == True
+    assert check[0] == True
 
     ## Process the lock here
     setup_strat.performUpkeep(EmptyBytes32, {"from": rando})
