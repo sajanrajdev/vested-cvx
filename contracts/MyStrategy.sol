@@ -498,10 +498,21 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// @dev process all locks, to redeem
+    /// @notice No Access Control Checks, anyone can unlock an expired lock
     function manualProcessExpiredLocks() public whenNotPaused {
-        _onlyGovernance();
-        LOCKER.processExpiredLocks(false);
         // Unlock veCVX that is expired and redeem CVX back to this strat
+        LOCKER.processExpiredLocks(false);
+    }
+
+    function checkUpkeep(bytes calldata checkData) external returns (bool upkeepNeeded, bytes memory performData) {
+        // We need to unlock funds if the lockedBalance (locked + unlocked) is greater than the balance (actively locked for this epoch)
+        upkeepNeeded = LOCKER.lockedBalanceOf(address(this)) > LOCKER.balanceOf(address(this));
+    }
+
+    /// @dev Function for ChainLink Keepers to automatically process expired locks
+    function performUpkeep(bytes calldata performData) external {
+        // Works like this because it reverts if lock is not expired
+        LOCKER.processExpiredLocks(false);
     }
 
     /// @dev Send all available CVX to the Vault
