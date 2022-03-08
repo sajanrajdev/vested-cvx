@@ -53,8 +53,8 @@ contract MyStrategy is BaseStrategy {
     ISettV4 public constant CVXCRV_VAULT =
         ISettV4(0x2B5455aac8d64C14786c3a29858E43b5945819C0);
 
-    // NOTE: At time of publishing, this contract is under audit
-    ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
+    // NOTE: Locker V2
+    ICvxLocker public constant LOCKER = ICvxLocker(0x72a19342e8F1838460eBFCCEf09F6585e32db86E);
 
     ICVXBribes public constant CVX_EXTRA_REWARDS = ICVXBribes(0xDecc7d761496d30F30b92Bdf764fb8803c79360D);
     IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);

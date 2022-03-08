@@ -1,4 +1,4 @@
-from brownie import CvxStakingProxy, chain
+from brownie import CvxStakingProxy, chain, accounts
 from helpers.constants import MaxUint256
 
 
@@ -35,8 +35,10 @@ def test_are_you_trying(deployer, sett, strategy, want, locker):
 
     # Use this if it should invest all
     assert want.balanceOf(strategy) == 0
-
-    CvxStakingProxy.at(locker.stakingProxy()).distribute({"from": deployer})
+    
+    stakingProxy = CvxStakingProxy.at(locker.stakingProxy())
+    stacking_gov = accounts.at(stakingProxy.owner(), force=True)
+    stakingProxy.distribute({"from": stacking_gov})
 
     ## TEST 2: Is the Harvest profitable?
     harvest = strategy.harvest({"from": deployer})
