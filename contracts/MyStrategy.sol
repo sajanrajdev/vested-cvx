@@ -461,9 +461,12 @@ contract MyStrategy is BaseStrategy {
         }
 
         // Send rest of earned to tree //We send all rest to avoid dust and avoid protecting the token
+        // We take difference of vault token to emit the event in shares rather than underlying
+        uint256 cvxCRVInitialBalance = CVXCRV_VAULT.balanceOf(BADGER_TREE);
         uint256 cvxCrvToTree = IERC20Upgradeable(reward).balanceOf(address(this));
         CVXCRV_VAULT.depositFor(BADGER_TREE, cvxCrvToTree);
-        emit TreeDistribution(address(CVXCRV_VAULT), cvxCrvToTree, block.number, block.timestamp);
+        uint256 cvxCRVAfterBalance = CVXCRV_VAULT.balanceOf(BADGER_TREE);
+        emit TreeDistribution(address(CVXCRV_VAULT), cvxCRVAfterBalance.sub(cvxCRVInitialBalance), block.number, block.timestamp);
 
 
         /// @dev Harvest event that every strategy MUST have, see BaseStrategy
