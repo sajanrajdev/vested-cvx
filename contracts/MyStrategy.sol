@@ -175,10 +175,49 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     }
 
     // TRUSTLESS VARIANTS OF CLAIMING FUNCTIONS
+
+    /// @dev Function to move rewards that are not protected
+    /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
+    /// @notice because token paths are harcoded, this function is safe to be called by anyone
+    function sweepRewardToken(address token) public nonReentrant {
+        _onlyNotProtectedTokens(token);
+
+        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
+        _handleRewardTransfer(token, toSend);
+    }
+
+    /// @dev Bulk function for sweepRewardToken
+    function sweepRewards(address[] calldata tokens) external {
+        uint256 length = tokens.length;
+        for(uint i = 0; i < length; i++){
+            sweepRewardToken(tokens[i]);
+        }
+    }
+
+    /// @dev Skim away want to bring back ppfs to 1e18
+    /// @notice permissioneless function as all paths are hardcoded
+    function skim() external nonReentrant {
+        // Just withdraw and deposit into more of the vault, and send it to tree
+        uint256 beforeBalance = _getBalance();
+        uint256 totalSupply = _getTotalSupply();
+
+        // Take the excess amount that is throwing off peg
+        // Works because both are in 1e18
+        uint256 excessAmount = beforeBalance.sub(totalSupply);
+
+        _sentTokenToBribesReceiver(want, excessAmount);
+        // Check that ppfs is 1, back to peg
+
+        // getPricePerFullShare == balance().mul(1e18).div(totalSupply())
+        require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
+    }
+
+    /// @dev Given the ExtraRewards address and a list of tokens, claims and processes them
+    /// @notice permissioneless function as all paths are hardcoded
+    /// @notice allows claiming any token as it uses the difference in balance
     function claimBribesFromConvexTrustless(ICVXBribes convexAddress, address[] memory tokens) external nonReentrant {
         uint256 beforeVaultBalance = _getBalance();
 
-        // Revert if you try to claim a protected token, this is to avoid rugging
         // Also checks balance diff
         uint256 length = tokens.length;
         uint256[] memory beforeBalance = new uint256[](length);
@@ -197,8 +236,10 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
     }
 
-        /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
+    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
     /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
+    /// @notice permissioneless function as all paths are hardcoded
+    /// @notice allows claiming any token as it uses the difference in balance
     function claimBribesFromVotiumTrustless(
         IVotiumBribes votiumTree,
         address account, 
@@ -209,14 +250,12 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     ) external nonReentrant {
         uint256 beforeVaultBalance = _getBalance();
 
-        // Revert if you try to claim a protected token, this is to avoid rugging
         require(tokens.length == indexes.length && tokens.length == amounts.length && tokens.length == merkleProofs.length, "Length Mismatch");
         // tokens.length = length, can't declare var as stack too deep
         uint256[] memory beforeBalance = new uint256[](tokens.length);
         for(uint i = 0; i < tokens.length; i++){
             beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
         }
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
 
         IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](tokens.length);
         for(uint x = 0; x < tokens.length; x++){
@@ -238,132 +277,6 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     }
 
     // END TRUSTLESS
-
-    /// *** Bribe Claiming ***
-    /// @dev given a token address, claim that as reward from CVX Extra Rewards
-    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    function claimBribeFromConvex (address token) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
-        // Claim reward for token
-        CVX_EXTRA_REWARDS.getReward(address(this), token);
-        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
-
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-
-    /// @dev given a list of token addresses, claim that as reward from CVX Extra Rewards
-    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    function claimBribesFromConvex(address[] calldata tokens) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        // Also checks balance diff
-        uint256 length = tokens.length;
-        uint256[] memory beforeBalance = new uint256[](length);
-        for(uint i = 0; i < length; i++){
-            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
-        }
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
-        // Claim reward for tokens
-        CVX_EXTRA_REWARDS.getRewards(address(this), tokens);
-
-        // Send reward to Multisig
-        for(uint x = 0; x < length; x++){
-            _handleRewardTransfer(tokens[x], IERC20Upgradeable(tokens[x]).balanceOf(address(this)).sub(beforeBalance[x]));
-        }
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-
-    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
-    /// @dev allows claiming of rewards, badger is sent to tree
-    function claimBribeFromVotium(
-        address token, 
-        uint256 index, 
-        address account, 
-        uint256 amount, 
-        bytes32[] calldata merkleProof
-    ) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
-        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
-        VOTIUM_BRIBE_CLAIMER.claim(token, index, account, amount, merkleProof);
-        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
-
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-
-    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
-    /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
-    function claimBribesFromVotium(
-        address account, 
-        address[] calldata tokens, 
-        uint256[] calldata indexes,
-        uint256[] calldata amounts, 
-        bytes32[][] calldata merkleProofs
-    ) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        require(tokens.length == indexes.length && tokens.length == amounts.length && tokens.length == merkleProofs.length, "Length Mismatch");
-        // tokens.length = length, can't declare var as stack too deep
-        uint256[] memory beforeBalance = new uint256[](tokens.length);
-        for(uint i = 0; i < tokens.length; i++){
-            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
-        }
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
-        IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](tokens.length);
-        for(uint x = 0; x < tokens.length; x++){
-            request[x] = IVotiumBribes.claimParam({
-                token: tokens[x],
-                index: indexes[x],
-                amount: amounts[x],
-                merkleProof: merkleProofs[x]
-            });
-        }
-
-        VOTIUM_BRIBE_CLAIMER.claimMulti(account, request);
-
-        for(uint i = 0; i < tokens.length; i++){
-            _handleRewardTransfer(tokens[i], IERC20Upgradeable(tokens[i]).balanceOf(address(this)).sub(beforeBalance[i]));
-        }
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-    
-    /// @dev Function to move rewards that are not protected
-    /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
-    /// @notice because token paths are harcoded, this function is safe to be called by anyone
-    function sweepRewardToken(address token) public {
-        _onlyGovernanceOrStrategist();
-        _onlyNotProtectedTokens(token);
-
-        uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
-        _handleRewardTransfer(token, toSend);
-    }
-
-    /// @dev Bulk function for sweepRewardToken
-    function sweepRewards(address[] calldata tokens) external {
-        uint256 length = tokens.length;
-        for(uint i = 0; i < length; i++){
-            sweepRewardToken(tokens[i]);
-        }
-    }
 
     /// *** Handling of rewards ***
     function _handleRewardTransfer(address token, uint256 amount) internal {
@@ -393,6 +306,11 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     function _getBalance() internal returns (uint256) {
         ISettV4 vault = ISettV4(IController(controller).vaults(want));
         return vault.balance();
+    }
+    /// @dev Get the current Vault.totalSupply
+    function _getTotalSupply() internal returns (uint256) {
+        ISettV4 vault = ISettV4(IController(controller).vaults(want));
+        return vault.totalSupply();
     }
 
     /// ===== View Functions =====
