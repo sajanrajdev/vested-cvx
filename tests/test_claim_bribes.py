@@ -31,6 +31,10 @@ SETT_ADDRESS = "0xfd05D3C7fe2924020620A8bE4961bBaA747e6305"
 
 STRAT_ADDRESS = "0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9"
 
+VOTIUM_TREE = "0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A"
+
+CVX_EXTRA_REWARDS = "0xDecc7d761496d30F30b92Bdf764fb8803c79360D"
+
 @pytest.fixture
 def vault_proxy():
     return SettV4.at(SETT_ADDRESS)
@@ -99,7 +103,7 @@ def test_claim_convex_single_bribe(upgraded_strat, bribes_receiver, real_strateg
 
     balance_for_receiver = spell_token.balanceOf(bribes_receiver)
 
-    claim_tx = upgraded_strat.claimBribeFromConvex(spell_token, {"from": real_strategist})
+    claim_tx = upgraded_strat.claimBribeFromConvex(CVX_EXTRA_REWARDS, spell_token, {"from": real_strategist})
 
     assert spell_token.balanceOf(bribes_receiver) > balance_for_receiver
 
@@ -115,6 +119,7 @@ def test_claim_convex_bulk_bribes(upgraded_strat, bribes_receiver, real_strategi
     balance_for_receiver_spell = spell_token.balanceOf(bribes_receiver)
 
     claim_tx = upgraded_strat.claimBribesFromConvex(
+        CVX_EXTRA_REWARDS,
         [spell_token],
         {"from": real_strategist}
     )
@@ -152,6 +157,7 @@ def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, bribe
   balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
   claim_tx = upgraded_strat.claimBribeFromVotium(
+    VOTIUM_TREE,
     TOKEN,
     INDEX,
     upgraded_strat,
@@ -172,6 +178,7 @@ def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, 
   balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
   claim_tx = upgraded_strat.claimBribesFromVotium(
+    VOTIUM_TREE,
     upgraded_strat,
     [TOKEN],
     [INDEX],
@@ -199,6 +206,7 @@ def test_random_cant_claim(upgraded_strat, badger_tree, real_strategist, bribes_
         
     with brownie.reverts():
         claim_tx = upgraded_strat.claimBribesFromVotium(
+            VOTIUM_TREE,
             upgraded_strat,
             [TOKEN],
             [INDEX],
@@ -232,7 +240,7 @@ def test_if_griefed_we_can_sweep(upgraded_strat, badger_tree, real_strategist, b
        Only token that can get stuck is CVX, in that case it's gonna increase ppfs but be safe
     """
 
-    merkle = interface.IVotiumBribes(upgraded_strat.VOTIUM_BRIBE_CLAIMER())
+    merkle = interface.IVotiumBribes(VOTIUM_TREE)
 
     spell_token = ERC20Upgradeable.at(TOKEN)
     balance_for_receiver = spell_token.balanceOf(bribes_receiver)

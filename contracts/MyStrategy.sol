@@ -174,12 +174,13 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         processLocksOnRebalance = newProcessLocksOnRebalance;
     }
 
-    // TRUSTLESS VARIANTS OF CLAIMING FUNCTIONS
+    // Claiming functions, wrote on 10th of March with goal of removing access controls on 10th June
 
     /// @dev Function to move rewards that are not protected
     /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
     /// @notice because token paths are harcoded, this function is safe to be called by anyone
     function sweepRewardToken(address token) public nonReentrant {
+        _onlyGovernanceOrStrategist();
         _onlyNotProtectedTokens(token);
 
         uint256 toSend = IERC20Upgradeable(token).balanceOf(address(this));
@@ -197,6 +198,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     /// @dev Skim away want to bring back ppfs to 1e18
     /// @notice permissioneless function as all paths are hardcoded
     function skim() external nonReentrant {
+        _onlyGovernanceOrStrategist();
         // Just withdraw and deposit into more of the vault, and send it to tree
         uint256 beforeBalance = _getBalance();
         uint256 totalSupply = _getTotalSupply();
@@ -205,6 +207,8 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         // Works because both are in 1e18
         uint256 excessAmount = beforeBalance.sub(totalSupply);
 
+        if(excessAmount == 0) { return; }
+
         _sentTokenToBribesReceiver(want, excessAmount);
         // Check that ppfs is 1, back to peg
 
@@ -212,11 +216,32 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
     }
 
+    /// @dev given a token address, and convexAddress claim that as reward from CVX Extra Rewards
+    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
+    function claimBribeFromConvex (ICVXBribes convexAddress, address token) external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
+
+
+        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
+        // Claim reward for token
+        convexAddress.getReward(address(this), token);
+        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
+
+        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
+    }
+
     /// @dev Given the ExtraRewards address and a list of tokens, claims and processes them
     /// @notice permissioneless function as all paths are hardcoded
     /// @notice allows claiming any token as it uses the difference in balance
-    function claimBribesFromConvexTrustless(ICVXBribes convexAddress, address[] memory tokens) external nonReentrant {
+    function claimBribesFromConvex(ICVXBribes convexAddress, address[] memory tokens) external nonReentrant {
+        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
 
         // Also checks balance diff
         uint256 length = tokens.length;
@@ -234,13 +259,38 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
+    }
+
+    /// @dev given the votium data and their tree address (available at: https://github.com/oo-00/Votium/tree/main/merkle)
+    /// @dev allows claiming of rewards, badger is sent to tree
+    function claimBribeFromVotium(
+        IVotiumBribes votiumTree,
+        address token, 
+        uint256 index, 
+        address account, 
+        uint256 amount, 
+        bytes32[] calldata merkleProof
+    ) external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
+
+        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
+        votiumTree.claim(token, index, account, amount, merkleProof);
+        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
+
+        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
     }
 
     /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
     /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
     /// @notice permissioneless function as all paths are hardcoded
     /// @notice allows claiming any token as it uses the difference in balance
-    function claimBribesFromVotiumTrustless(
+    function claimBribesFromVotium(
         IVotiumBribes votiumTree,
         address account, 
         address[] calldata tokens, 
@@ -248,7 +298,9 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         uint256[] calldata amounts, 
         bytes32[][] calldata merkleProofs
     ) external nonReentrant {
+        _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
 
         require(tokens.length == indexes.length && tokens.length == amounts.length && tokens.length == merkleProofs.length, "Length Mismatch");
         // tokens.length = length, can't declare var as stack too deep
@@ -270,10 +322,12 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         votiumTree.claimMulti(account, request);
 
         for(uint i = 0; i < tokens.length; i++){
-            _handleRewardTransfer(tokens[i], IERC20Upgradeable(tokens[i]).balanceOf(address(this)).sub(beforeBalance[i]));
+            address token = tokens[i]; // Caching it allows it to compile else we hit stack too deep
+            _handleRewardTransfer(token, IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]));
         }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
     }
 
     // END TRUSTLESS
@@ -311,6 +365,11 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     function _getTotalSupply() internal returns (uint256) {
         ISettV4 vault = ISettV4(IController(controller).vaults(want));
         return vault.totalSupply();
+    }
+
+    function _getPricePerFullShare() internal returns (uint256) {
+        ISettV4 vault = ISettV4(IController(controller).vaults(want));
+        return vault.getPricePerFullShare();
     }
 
     /// ===== View Functions =====
@@ -351,8 +410,8 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     {
         address[] memory protectedTokens = new address[](3);
         protectedTokens[0] = want;
-        protectedTokens[1] = lpComponent;
-        protectedTokens[2] = reward;
+        protectedTokens[1] = lpComponent; // vlCVX
+        protectedTokens[2] = reward; // cvxCRV // 
         return protectedTokens;
     }
 
@@ -456,7 +515,6 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         CVXCRV_VAULT.depositFor(BADGER_TREE, cvxCrvToTree);
         uint256 cvxCRVAfterBalance = CVXCRV_VAULT.balanceOf(BADGER_TREE);
         emit TreeDistribution(address(CVXCRV_VAULT), cvxCRVAfterBalance.sub(cvxCRVInitialBalance), block.number, block.timestamp);
-
 
         /// @dev Harvest event that every strategy MUST have, see BaseStrategy
         emit Harvest(earnedReward, block.number);

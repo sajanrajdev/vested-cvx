@@ -6,6 +6,10 @@ from eth_utils import encode_hex
 
 """
   Checks that ratio changes allow different investment profiles
+  NOTE: These tests will fail as you need to update them for a new roleplay
+  Update
+  Then rename to test_roleplay_unlock.py
+  To run these
 """
 
 SETT_ADDRESS = "0xfd05D3C7fe2924020620A8bE4961bBaA747e6305"
