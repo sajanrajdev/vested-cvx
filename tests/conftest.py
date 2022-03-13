@@ -17,6 +17,9 @@ from helpers.constants import MaxUint256
 def deployer():
     return accounts[0]
 
+@pytest.fixture
+def rando():
+    return accounts[6]
 
 ## CVX Locker ##
 @pytest.fixture
@@ -75,6 +78,7 @@ def deployed():
         guardian,
         PROTECTED_TOKENS,
         FEES,
+        {"from": deployer}
     )
 
     ## Tool that verifies bytecode (run independently) <- Webapp for anyone to verify

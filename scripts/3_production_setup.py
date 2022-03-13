@@ -13,6 +13,7 @@ console = Console()
 
 sleep_between_tx = 1
 
+TECH_OPS = "0x86cbd0ce0c087b482782c181da8d191de18c8275"
 
 def main():
     """
@@ -34,7 +35,7 @@ def main():
     dev = connect_account()
 
     # Add deployed Strategy and Vault contracts here:
-    strategy = MyStrategy.at("0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9")
+    strategy = MyStrategy.at("0x898111d1f4eb55025d0036568212425ee2274082")
     vault = SettV4.at("0xfd05D3C7fe2924020620A8bE4961bBaA747e6305")
 
     assert strategy.paused() == False
@@ -118,11 +119,12 @@ def set_parameters(dev, strategy, vault, governance, guardian, keeper, controlle
 
     console.print("[green]Guardian existing or set at: [/green]", guardian)
 
-    if strategy.strategist() != governance:
-        strategy.setStrategist(governance, {"from": dev})
+    ## Strategist is tech_ops now
+    if strategy.strategist() != TECH_OPS:
+        strategy.setStrategist(TECH_OPS, {"from": dev})
         time.sleep(sleep_between_tx)
 
-    console.print("[green]Strategist existing or set at: [/green]", governance)
+    console.print("[green]Strategist existing or set at: [/green]", TECH_OPS)
 
     if strategy.governance() != governance:
         strategy.setGovernance(governance, {"from": dev})
@@ -153,14 +155,14 @@ def check_parameters(
     assert vault.keeper() == keeper
     assert strategy.guardian() == guardian
     assert vault.guardian() == guardian
-    assert strategy.strategist() == governance
+    assert strategy.strategist() == TECH_OPS
     assert strategy.governance() == governance
     assert vault.governance() == governance
 
-    # Not all strategies use the badgerTree
+    # Edited for bveCVX
     try:
-        if strategy.badgerTree() != AddressZero:
-            assert strategy.badgerTree() == badgerTree
+        if strategy.BADGER_TREE() != AddressZero:
+            assert strategy.BADGER_TREE() == badgerTree
     except:
         pass
 

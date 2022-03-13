@@ -7,6 +7,7 @@ import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeabl
 import "../deps/@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "../deps/@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../interfaces/badger/ISettV4.sol";
 import "../interfaces/badger/IController.sol";
@@ -17,6 +18,8 @@ import "../interfaces/snapshot/IDelegateRegistry.sol";
 import "../interfaces/curve/ICurvePool.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 
 /**
  * CHANGELOG
@@ -25,8 +28,10 @@ import {BaseStrategy} from "../deps/BaseStrategy.sol";
  * V1.2 Update to emit badger, all other rewards are sent to multisig
  * V1.3 Updated Address to claim CVX Rewards
  * V1.4 Updated Claiming mechanism to allow claiming any token (using difference in balances)
+ * V1.5 Unlocks are permissioneless, added Chainlink Keepeers integration
+ * V1.6 New Locker, work towards fully permissioneless claiming // Protected Launch
  */
-contract MyStrategy is BaseStrategy {
+contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
@@ -52,8 +57,8 @@ contract MyStrategy is BaseStrategy {
     ISettV4 public constant CVXCRV_VAULT =
         ISettV4(0x2B5455aac8d64C14786c3a29858E43b5945819C0);
 
-    // NOTE: At time of publishing, this contract is under audit
-    ICvxLocker public constant LOCKER = ICvxLocker(0xD18140b4B819b895A3dba5442F959fA44994AF50);
+    // NOTE: Locker V2
+    ICvxLocker public constant LOCKER = ICvxLocker(0x72a19342e8F1838460eBFCCEf09F6585e32db86E);
 
     ICVXBribes public constant CVX_EXTRA_REWARDS = ICVXBribes(0xDecc7d761496d30F30b92Bdf764fb8803c79360D);
     IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);
@@ -113,6 +118,8 @@ contract MyStrategy is BaseStrategy {
             _guardian
         );
 
+        __ReentrancyGuard_init();
+
         /// @dev Add config here
         want = _wantConfig[0];
         lpComponent = _wantConfig[1];
@@ -168,116 +175,12 @@ contract MyStrategy is BaseStrategy {
         processLocksOnRebalance = newProcessLocksOnRebalance;
     }
 
-    /// *** Bribe Claiming ***
-    /// @dev given a token address, claim that as reward from CVX Extra Rewards
-    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    function claimBribeFromConvex (address token) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
+    // Claiming functions, wrote on 10th of March with goal of removing access controls on 10th June
 
-        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
-        // Claim reward for token
-        CVX_EXTRA_REWARDS.getReward(address(this), token);
-        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
-
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-
-    /// @dev given a list of token addresses, claim that as reward from CVX Extra Rewards
-    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    function claimBribesFromConvex(address[] calldata tokens) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        // Also checks balance diff
-        uint256 length = tokens.length;
-        uint256[] memory beforeBalance = new uint256[](length);
-        for(uint i = 0; i < length; i++){
-            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
-        }
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
-        // Claim reward for tokens
-        CVX_EXTRA_REWARDS.getRewards(address(this), tokens);
-
-        // Send reward to Multisig
-        for(uint x = 0; x < length; x++){
-            _handleRewardTransfer(tokens[x], IERC20Upgradeable(tokens[x]).balanceOf(address(this)).sub(beforeBalance[x]));
-        }
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-
-    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
-    /// @dev allows claiming of rewards, badger is sent to tree
-    function claimBribeFromVotium(
-        address token, 
-        uint256 index, 
-        address account, 
-        uint256 amount, 
-        bytes32[] calldata merkleProof
-    ) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
-        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
-        VOTIUM_BRIBE_CLAIMER.claim(token, index, account, amount, merkleProof);
-        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
-
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
-    /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
-    function claimBribesFromVotium(
-        address account, 
-        address[] calldata tokens, 
-        uint256[] calldata indexes,
-        uint256[] calldata amounts, 
-        bytes32[][] calldata merkleProofs
-    ) external {
-        _onlyGovernanceOrStrategist();
-        uint256 beforeVaultBalance = _getBalance();
-
-        // Revert if you try to claim a protected token, this is to avoid rugging
-        require(tokens.length == indexes.length && tokens.length == amounts.length && tokens.length == merkleProofs.length, "Length Mismatch");
-        // tokens.length = length, can't declare var as stack too deep
-        uint256[] memory beforeBalance = new uint256[](tokens.length);
-        for(uint i = 0; i < tokens.length; i++){
-            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
-        }
-        // NOTE: If we end up getting bribes in form or protected tokens, we'll have to change
-
-        IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](tokens.length);
-        for(uint x = 0; x < tokens.length; x++){
-            request[x] = IVotiumBribes.claimParam({
-                token: tokens[x],
-                index: indexes[x],
-                amount: amounts[x],
-                merkleProof: merkleProofs[x]
-            });
-        }
-
-        VOTIUM_BRIBE_CLAIMER.claimMulti(account, request);
-
-        for(uint i = 0; i < tokens.length; i++){
-            _handleRewardTransfer(tokens[i], IERC20Upgradeable(tokens[i]).balanceOf(address(this)).sub(beforeBalance[i]));
-        }
-
-        require(beforeVaultBalance == _getBalance(), "Balance can't change");
-    }
-    
     /// @dev Function to move rewards that are not protected
     /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
     /// @notice because token paths are harcoded, this function is safe to be called by anyone
-    function sweepRewardToken(address token) public {
+    function sweepRewardToken(address token) public nonReentrant {
         _onlyGovernanceOrStrategist();
         _onlyNotProtectedTokens(token);
 
@@ -292,6 +195,143 @@ contract MyStrategy is BaseStrategy {
             sweepRewardToken(tokens[i]);
         }
     }
+
+    /// @dev Skim away want to bring back ppfs to 1e18
+    /// @notice permissioneless function as all paths are hardcoded // In the future
+    function skim() external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        // Just withdraw and deposit into more of the vault, and send it to tree
+        uint256 beforeBalance = _getBalance();
+        uint256 totalSupply = _getTotalSupply();
+
+        // Take the excess amount that is throwing off peg
+        // Works because both are in 1e18
+        uint256 excessAmount = beforeBalance.sub(totalSupply);
+
+        if(excessAmount == 0) { return; }
+
+        _sentTokenToBribesReceiver(want, excessAmount);
+        // Check that ppfs is 1, back to peg
+
+        // getPricePerFullShare == balance().mul(1e18).div(totalSupply())
+        require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
+    }
+
+    /// @dev given a token address, and convexAddress claim that as reward from CVX Extra Rewards
+    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
+    function claimBribeFromConvex (ICVXBribes convexAddress, address token) external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
+
+
+        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
+        // Claim reward for token
+        convexAddress.getReward(address(this), token);
+        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
+
+        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
+    }
+
+    /// @dev Given the ExtraRewards address and a list of tokens, claims and processes them
+    /// @notice permissioneless function as all paths are hardcoded // In the future
+    /// @notice allows claiming any token as it uses the difference in balance
+    function claimBribesFromConvex(ICVXBribes convexAddress, address[] memory tokens) external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
+
+        // Also checks balance diff
+        uint256 length = tokens.length;
+        uint256[] memory beforeBalance = new uint256[](length);
+        for(uint i = 0; i < length; i++){
+            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
+        }
+
+        // Claim reward for tokens
+        convexAddress.getRewards(address(this), tokens);
+
+        // Send reward to Multisig
+        for(uint x = 0; x < length; x++){
+            _handleRewardTransfer(tokens[x], IERC20Upgradeable(tokens[x]).balanceOf(address(this)).sub(beforeBalance[x]));
+        }
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
+    }
+
+    /// @dev given the votium data and their tree address (available at: https://github.com/oo-00/Votium/tree/main/merkle)
+    /// @dev allows claiming of rewards, badger is sent to tree
+    function claimBribeFromVotium(
+        IVotiumBribes votiumTree,
+        address token, 
+        uint256 index, 
+        address account, 
+        uint256 amount, 
+        bytes32[] calldata merkleProof
+    ) external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
+
+        uint256 beforeBalance = IERC20Upgradeable(token).balanceOf(address(this));
+        votiumTree.claim(token, index, account, amount, merkleProof);
+        uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
+
+        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
+    }
+
+    /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
+    /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
+    /// @notice permissioneless function as all paths are hardcoded // In the future
+    /// @notice allows claiming any token as it uses the difference in balance
+    function claimBribesFromVotium(
+        IVotiumBribes votiumTree,
+        address account, 
+        address[] calldata tokens, 
+        uint256[] calldata indexes,
+        uint256[] calldata amounts, 
+        bytes32[][] calldata merkleProofs
+    ) external nonReentrant {
+        _onlyGovernanceOrStrategist();
+        uint256 beforeVaultBalance = _getBalance();
+        uint256 beforePricePerFullShare = _getPricePerFullShare();
+
+        require(tokens.length == indexes.length && tokens.length == amounts.length && tokens.length == merkleProofs.length, "Length Mismatch");
+        // tokens.length = length, can't declare var as stack too deep
+        uint256[] memory beforeBalance = new uint256[](tokens.length);
+        for(uint i = 0; i < tokens.length; i++){
+            beforeBalance[i] = IERC20Upgradeable(tokens[i]).balanceOf(address(this));
+        }
+
+        IVotiumBribes.claimParam[] memory request = new IVotiumBribes.claimParam[](tokens.length);
+        for(uint x = 0; x < tokens.length; x++){
+            request[x] = IVotiumBribes.claimParam({
+                token: tokens[x],
+                index: indexes[x],
+                amount: amounts[x],
+                merkleProof: merkleProofs[x]
+            });
+        }
+
+        votiumTree.claimMulti(account, request);
+
+        for(uint i = 0; i < tokens.length; i++){
+            address token = tokens[i]; // Caching it allows it to compile else we hit stack too deep
+            _handleRewardTransfer(token, IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]));
+        }
+
+        require(beforeVaultBalance == _getBalance(), "Balance can't change");
+        require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
+    }
+
+    // END TRUSTLESS
 
     /// *** Handling of rewards ***
     function _handleRewardTransfer(address token, uint256 amount) internal {
@@ -322,13 +362,23 @@ contract MyStrategy is BaseStrategy {
         ISettV4 vault = ISettV4(IController(controller).vaults(want));
         return vault.balance();
     }
+    /// @dev Get the current Vault.totalSupply
+    function _getTotalSupply() internal returns (uint256) {
+        ISettV4 vault = ISettV4(IController(controller).vaults(want));
+        return vault.totalSupply();
+    }
+
+    function _getPricePerFullShare() internal returns (uint256) {
+        ISettV4 vault = ISettV4(IController(controller).vaults(want));
+        return vault.getPricePerFullShare();
+    }
 
     /// ===== View Functions =====
 
     function getBoostPayment() public view returns(uint256){
-        uint256 maximumBoostPayment = LOCKER.maximumBoostPayment();
-        require(maximumBoostPayment <= 1500, "over max payment"); //max 15%
-        return maximumBoostPayment;
+        // uint256 maximumBoostPayment = LOCKER.maximumBoostPayment();
+        // require(maximumBoostPayment <= 1500, "over max payment"); //max 15%
+        return 0; // Unused at this stage, so for security reasons we just zero it
     }
 
     /// @dev Specify the name of the strategy
@@ -338,7 +388,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.4";
+        return "1.6";
     }
 
     /// @dev Balance of want currently held in strategy positions
@@ -361,8 +411,8 @@ contract MyStrategy is BaseStrategy {
     {
         address[] memory protectedTokens = new address[](3);
         protectedTokens[0] = want;
-        protectedTokens[1] = lpComponent;
-        protectedTokens[2] = reward;
+        protectedTokens[1] = lpComponent; // vlCVX
+        protectedTokens[2] = reward; // cvxCRV // 
         return protectedTokens;
     }
 
@@ -460,10 +510,12 @@ contract MyStrategy is BaseStrategy {
         }
 
         // Send rest of earned to tree //We send all rest to avoid dust and avoid protecting the token
+        // We take difference of vault token to emit the event in shares rather than underlying
+        uint256 cvxCRVInitialBalance = CVXCRV_VAULT.balanceOf(BADGER_TREE);
         uint256 cvxCrvToTree = IERC20Upgradeable(reward).balanceOf(address(this));
         CVXCRV_VAULT.depositFor(BADGER_TREE, cvxCrvToTree);
-        emit TreeDistribution(address(CVXCRV_VAULT), cvxCrvToTree, block.number, block.timestamp);
-
+        uint256 cvxCRVAfterBalance = CVXCRV_VAULT.balanceOf(BADGER_TREE);
+        emit TreeDistribution(address(CVXCRV_VAULT), cvxCRVAfterBalance.sub(cvxCRVInitialBalance), block.number, block.timestamp);
 
         /// @dev Harvest event that every strategy MUST have, see BaseStrategy
         emit Harvest(earnedReward, block.number);
@@ -498,10 +550,21 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// @dev process all locks, to redeem
+    /// @notice No Access Control Checks, anyone can unlock an expired lock
     function manualProcessExpiredLocks() public whenNotPaused {
-        _onlyGovernance();
-        LOCKER.processExpiredLocks(false);
         // Unlock veCVX that is expired and redeem CVX back to this strat
+        LOCKER.processExpiredLocks(false);
+    }
+
+    function checkUpkeep(bytes calldata checkData) external view returns (bool upkeepNeeded, bytes memory performData) {
+        // We need to unlock funds if the lockedBalance (locked + unlocked) is greater than the balance (actively locked for this epoch)
+        upkeepNeeded = LOCKER.lockedBalanceOf(address(this)) > LOCKER.balanceOf(address(this));
+    }
+
+    /// @dev Function for ChainLink Keepers to automatically process expired locks
+    function performUpkeep(bytes calldata performData) external {
+        // Works like this because it reverts if lock is not expired
+        LOCKER.processExpiredLocks(false);
     }
 
     /// @dev Send all available CVX to the Vault
