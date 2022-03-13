@@ -196,7 +196,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     }
 
     /// @dev Skim away want to bring back ppfs to 1e18
-    /// @notice permissioneless function as all paths are hardcoded
+    /// @notice permissioneless function as all paths are hardcoded // In the future
     function skim() external nonReentrant {
         _onlyGovernanceOrStrategist();
         // Just withdraw and deposit into more of the vault, and send it to tree
@@ -236,7 +236,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     }
 
     /// @dev Given the ExtraRewards address and a list of tokens, claims and processes them
-    /// @notice permissioneless function as all paths are hardcoded
+    /// @notice permissioneless function as all paths are hardcoded // In the future
     /// @notice allows claiming any token as it uses the difference in balance
     function claimBribesFromConvex(ICVXBribes convexAddress, address[] memory tokens) external nonReentrant {
         _onlyGovernanceOrStrategist();
@@ -288,7 +288,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
     /// @dev given the votium data (available at: https://github.com/oo-00/Votium/tree/main/merkle)
     /// @dev allows claiming of multiple rewards rewards, badger is sent to tree
-    /// @notice permissioneless function as all paths are hardcoded
+    /// @notice permissioneless function as all paths are hardcoded // In the future
     /// @notice allows claiming any token as it uses the difference in balance
     function claimBribesFromVotium(
         IVotiumBribes votiumTree,
