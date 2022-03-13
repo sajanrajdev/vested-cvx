@@ -124,7 +124,7 @@ def set_parameters(dev, strategy, vault, governance, guardian, keeper, controlle
         strategy.setStrategist(TECH_OPS, {"from": dev})
         time.sleep(sleep_between_tx)
 
-    console.print("[green]Strategist existing or set at: [/green]", governance)
+    console.print("[green]Strategist existing or set at: [/green]", TECH_OPS)
 
     if strategy.governance() != governance:
         strategy.setGovernance(governance, {"from": dev})
