@@ -29,6 +29,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * V1.3 Updated Address to claim CVX Rewards
  * V1.4 Updated Claiming mechanism to allow claiming any token (using difference in balances)
  * V1.5 Unlocks are permissioneless, added Chainlink Keepeers integration
+ * V1.6 New Locker, work towards fully permissioneless claiming // Protected Launch
  */
 contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -387,7 +388,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.5";
+        return "1.6";
     }
 
     /// @dev Balance of want currently held in strategy positions
