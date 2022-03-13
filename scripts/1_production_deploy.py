@@ -53,35 +53,35 @@ def main():
     assert symbol != "bveSymbolPrefixHere"
 
     # Deploy controller
-    controller = deploy_controller(dev, proxyAdmin)
+    controller = Controller.at("0x63cf44b2548e4493fd099222a1ec79f3344d9682")
 
     # Deploy Vault
-    vault = deploy_vault(
-        controller.address,
-        dev.address,  # Deployer will be set as governance for testing stage
-        keeper,
-        guardian,
-        dev,
-        proxyAdmin,
-        name,
-        symbol
-    )
-
-    # Deploy Strategy
-    # strategy = deploy_strategy(
+    # vault = deploy_vault(
     #     controller.address,
     #     dev.address,  # Deployer will be set as governance for testing stage
-    #     strategist,
     #     keeper,
     #     guardian,
     #     dev,
     #     proxyAdmin,
+    #     name,
+    #     symbol
     # )
 
-    strategy = MyStrategy.at("0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9")
+    vault = SettV4.at("0xfd05D3C7fe2924020620A8bE4961bBaA747e6305")
+
+    # Deploy Strategy
+    strategy = deploy_strategy(
+        controller.address,
+        dev.address,  # Deployer will be set as governance for testing stage
+        strategist,
+        keeper,
+        guardian,
+        dev,
+        proxyAdmin,
+    )
 
     # Wire up vault and strategy to test controller
-    wire_up_test_controller(controller, vault, strategy, dev)
+    # wire_up_test_controller(controller, vault, strategy, dev)
 
 
 def deploy_controller(dev, proxyAdmin):
