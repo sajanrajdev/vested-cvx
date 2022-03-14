@@ -66,6 +66,8 @@ def test_is_profitable(deployed):
     reward_after = reward.balanceOf(strategy.strategist())
 
     ## Custom check for rewards being sent to gov as resolver is too complex
-    assert reward_after > reward_before
+    ## Governance and Strategist rewards point to the same address
+    if strategy.performanceFeeGovernance() > 0 or strategy.performanceFeeStrategist() > 0:
+        assert reward_after > reward_before
 
     assert ending_balance > initial_balance_with_fees
