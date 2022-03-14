@@ -18,7 +18,6 @@ import "../interfaces/snapshot/IDelegateRegistry.sol";
 import "../interfaces/curve/ICurvePool.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 
 /**
