@@ -10,15 +10,16 @@ autofetch_sources: True
 dependencies:
   - OpenZeppelin/openzeppelin-contracts@3.4.0
   - GalloDaSballo/fair-selling@rc.0
+  - OpenZeppelin/openzeppelin-contracts@4.5.0/
 
 
 # path remapping to support imports from GitHub/NPM
 compiler:
   solc:
-    version: 0.6.12
+    version: null
     remappings:
       - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@3.4.0"
       - "@seller=GalloDaSballo/fair-selling@rc.0"
+      - "@oz=OpenZeppelin/openzeppelin-contracts@4.5.0/contracts/"
 
-reports:
-  exclude_contracts:
+

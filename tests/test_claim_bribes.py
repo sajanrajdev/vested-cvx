@@ -4,7 +4,6 @@ from brownie import (
     Controller,
     SettV4,
     MyStrategy,
-    ERC20Upgradeable,
     Contract
 )
 import brownie
@@ -99,7 +98,7 @@ def isolation(fn_isolation):
 
 def test_claim_convex_single_bribe(upgraded_strat, bribes_receiver, real_strategist):
 
-    spell_token = ERC20Upgradeable.at("0x090185f2135308bad17527004364ebcc2d37e5f6")
+    spell_token = interface.IERC20("0x090185f2135308bad17527004364ebcc2d37e5f6")
 
     balance_for_receiver = spell_token.balanceOf(bribes_receiver)
 
@@ -114,7 +113,7 @@ def test_claim_convex_bulk_bribes(upgraded_strat, bribes_receiver, real_strategi
         Note: We only claim spell because rest of tokens claimableRewards is 0
     """
 
-    spell_token = ERC20Upgradeable.at("0x090185f2135308bad17527004364ebcc2d37e5f6")
+    spell_token = interface.IERC20("0x090185f2135308bad17527004364ebcc2d37e5f6")
 
     balance_for_receiver_spell = spell_token.balanceOf(bribes_receiver)
 
@@ -153,7 +152,7 @@ PROOF = [
 ]
 
 def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
-  cvx_token = ERC20Upgradeable.at(TOKEN)
+  cvx_token = interface.IERC20(TOKEN)
   balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
   claim_tx = upgraded_strat.claimBribeFromVotium(
@@ -174,7 +173,7 @@ def test_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, bribe
   assert claim_tx.events["RewardsCollected"]["amount"] >= 0
 
 def test_bulk_claim_votium_bribes(upgraded_strat, badger_tree, real_strategist, bribes_receiver):
-  cvx_token = ERC20Upgradeable.at(TOKEN)
+  cvx_token = interface.IERC20(TOKEN)
   balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
   claim_tx = upgraded_strat.claimBribesFromVotium(
@@ -198,7 +197,7 @@ def test_random_cant_claim(upgraded_strat, badger_tree, real_strategist, bribes_
     """
         NOTE: We removed ability for randoms to call so this test checks for reverts
     """
-    cvx_token = ERC20Upgradeable.at(TOKEN)
+    cvx_token = interface.IERC20(TOKEN)
     balance_for_receiver_cvx = cvx_token.balanceOf(bribes_receiver)
 
     rando = accounts[6]
@@ -242,7 +241,7 @@ def test_if_griefed_we_can_sweep(upgraded_strat, badger_tree, real_strategist, b
 
     merkle = interface.IVotiumBribes(VOTIUM_TREE)
 
-    spell_token = ERC20Upgradeable.at(TOKEN)
+    spell_token = interface.IERC20(TOKEN)
     balance_for_receiver = spell_token.balanceOf(bribes_receiver)
 
     rando = accounts[6]
