@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.11;
+pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -14,6 +14,7 @@ import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
 import "../interfaces/cvx/ICVXBribes.sol";
 import "../interfaces/cvx/IVotiumBribes.sol";
+import "../interfaces/badger/IBribesProcessor.sol";
 import "../interfaces/snapshot/IDelegateRegistry.sol";
 import "../interfaces/curve/ICurvePool.sol";
 
@@ -179,6 +180,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     /// @dev Function to move rewards that are not protected
     /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
     /// @notice because token paths are harcoded, this function is safe to be called by anyone
+    /// @notice Will not notify the bribesProcessor as this could be triggered outside bribes
     function sweepRewardToken(address token) public nonReentrant {
         _onlyGovernanceOrStrategist();
         _onlyNotProtectedTokens(token);
@@ -210,7 +212,6 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         if(excessAmount == 0) { return; }
 
         _sentTokenToBribesReceiver(want, excessAmount);
-        // Check that ppfs is 1, back to peg
 
         // getPricePerFullShare == balance().mul(1e18).div(totalSupply())
         require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
@@ -229,7 +230,12 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         convexAddress.getReward(address(this), token);
         uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
 
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+        uint256 difference = afterBalance.sub(beforeBalance);
+        _handleRewardTransfer(token, difference);
+
+        if(difference > 0) {
+            _notifyBribesProcessor();
+        }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
         require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
@@ -253,9 +259,19 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         // Claim reward for tokens
         convexAddress.getRewards(address(this), tokens);
 
+
+        uint256 lastDifference; // Cached value but also to check if we need to notifyProcessor
+        // Ultimately it's proof of non-zero which is good enough
+
         // Send reward to Multisig
         for(uint x = 0; x < length; x++){
-            _handleRewardTransfer(tokens[x], IERC20Upgradeable(tokens[x]).balanceOf(address(this)).sub(beforeBalance[x]));
+            address token = tokens[x];
+            lastDifference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[x]);
+            _handleRewardTransfer(tokens[x], lastDifference);
+        }
+
+        if(lastDifference > 0) {
+            _notifyBribesProcessor();
         }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
@@ -280,7 +296,13 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         votiumTree.claim(token, index, account, amount, merkleProof);
         uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
 
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+        uint256 difference = afterBalance.sub(beforeBalance);
+
+        _handleRewardTransfer(token, difference);
+
+        if(difference > 0) {
+            _notifyBribesProcessor();
+        }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
         require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
@@ -326,6 +348,8 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
             _handleRewardTransfer(token, IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]));
         }
 
+        // TODO: notifyReceiver if at least one token balance is non-zero
+
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
         require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
     }
@@ -338,9 +362,14 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         if (token == BADGER){
             _sendBadgerToTree(amount);
         } else {
-        // NOTE: All other tokens are sent to multisig
+        // NOTE: All other tokens are sent to bribes processor
             _sentTokenToBribesReceiver(token, amount);
         }
+    }
+
+    /// @dev Notify the BribesProcessor that a new round of bribes has happened
+    function _notifyBribesProcessor() internal {
+        IBribesProcessor(BRIBES_RECEIVER).notifyNewRound();
     }
 
     /// @dev Send funds to the bribes receiver
