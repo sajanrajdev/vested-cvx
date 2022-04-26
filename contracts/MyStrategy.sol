@@ -64,7 +64,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);
     
     // We hardcode, an upgrade is required to change this as it's a meaningful change
-    address public constant BRIBES_PROCESSOR = 0x53a2Ea9c137771931737034081005400785fb811;
+    address public constant BRIBES_PROCESSOR = 0xbeD8f323456578981952e33bBfbE80D23289246B;
     
     // We emit badger through the tree to the vault holders
     address public constant BADGER = 0x3472A5A71965499acd81997a54BBA8D852C6E53d;
