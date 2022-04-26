@@ -1,3 +1,4 @@
+from numpy import real
 import pytest
 import brownie
 from brownie import *
@@ -86,3 +87,19 @@ def test_lifecycle_processor_list_votium(bribes_processor, fake_bribes, test_tok
   ## Verify timestamp did change
   assert test_token.balanceOf(bribes_processor) == initial_receiver_bal + test_token_amount
   assert bribes_processor.lastBribeAction() > initial_processor_timestamp
+
+
+def test_sweep_doesnt_change_timestamp(bribes_processor, upgraded_strat, real_strategist, test_token, test_whale, test_token_amount):
+  ## Send some token to sweep
+  test_token.transfer(upgraded_strat, test_token_amount, {"from": test_whale})
+  initial_processor_timestamp = bribes_processor.lastBribeAction()
+  initial_receiver_bal = test_token.balanceOf(bribes_processor)
+
+  ## Sweep it
+  upgraded_strat.sweepRewardToken(test_token, {"from": real_strategist})
+
+  ## Balance has increased, timestamp is same as before
+  assert test_token.balanceOf(bribes_processor) == initial_receiver_bal + test_token_amount
+  assert bribes_processor.lastBribeAction() == initial_processor_timestamp
+
+  

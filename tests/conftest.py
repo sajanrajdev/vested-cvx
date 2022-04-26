@@ -270,19 +270,19 @@ def upgraded_strat(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_a
 
 @pytest.fixture
 def test_token():
-    ## cvxCRV
-    return interface.IERC20("0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7")
+    ## USDC
+    return interface.IERC20("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 
 
 @pytest.fixture
 def test_whale():
-    ## Cvx Rewards
-    return accounts.at("0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7", force=True)
+    ## Maker
+    return accounts.at("0x0a59649758aa4d66e25f08dd01271e891fe52199", force=True)
 
 
 @pytest.fixture
 def test_token_amount():
-    return 1e19
+    return 1e7
     
 @pytest.fixture
 def bribes_receiver(upgraded_strat):
