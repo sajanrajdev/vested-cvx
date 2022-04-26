@@ -228,7 +228,7 @@ def setup_strat(deployer, sett, strategy, want):
 
 SETT_ADDRESS = "0xfd05D3C7fe2924020620A8bE4961bBaA747e6305"
 
-STRAT_ADDRESS = "0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9"
+STRAT_ADDRESS = "0x898111d1F4eB55025D0036568212425EE2274082"
 
 VOTIUM_TREE = "0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A"
 
@@ -268,6 +268,38 @@ def upgraded_strat(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_a
     proxy_admin.upgrade(strat_proxy, new_strat_logic, {"from": proxy_admin_gov})
     return strat_proxy
 
+@pytest.fixture
+def test_token():
+    ## cvxCRV
+    return interface.IERC20("0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7")
+
+
+@pytest.fixture
+def test_whale():
+    ## Cvx Rewards
+    return accounts.at("0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7", force=True)
+
+
+@pytest.fixture
+def test_token_amount():
+    return 1e19
+    
+@pytest.fixture
+def bribes_receiver(upgraded_strat):
+    return upgraded_strat.BRIBES_PROCESSOR()
+@pytest.fixture
+def badger_tree(upgraded_strat):
+    return upgraded_strat.BADGER_TREE()
+
+@pytest.fixture
+def bribes_processor(bribes_receiver):
+    ## Redeclare with new name so we don't break old tests, but can have new tests with new meaning
+    return BribesProcessor.at(bribes_receiver)
+
+@pytest.fixture
+def real_strategist(upgraded_strat):
+    return accounts.at(upgraded_strat.strategist(), force=True)
+    
 ## Forces reset before each test
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):

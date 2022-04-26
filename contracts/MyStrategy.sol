@@ -211,7 +211,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
         if(excessAmount == 0) { return; }
 
-        bribesPro_sentTokenToBribesProcessor(want, excessAmount);
+        _sendTokenToBribesProcessor(want, excessAmount);
 
         // getPricePerFullShare == balance().mul(1e18).div(totalSupply())
         require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
@@ -219,7 +219,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
     /// @dev given a token address, and convexAddress claim that as reward from CVX Extra Rewards
     /// @notice funds are transfered to the hardcoded address BRIBES_PROCESSOR
-    function claimBribeFromConvex (ICVXBribes convexAddress, address token) external nonReentrant {
+    function claimBribeFromConvex(ICVXBribes convexAddress, address token) external nonReentrant {
         _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
         uint256 beforePricePerFullShare = _getPricePerFullShare();
@@ -343,12 +343,19 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
         votiumTree.claimMulti(account, request);
 
+        uint256 lastDifference; // Cached value but also to check if we need to notifyProcessor
+        // Ultimately it's proof of non-zero which is good enough
+
         for(uint i = 0; i < tokens.length; i++){
             address token = tokens[i]; // Caching it allows it to compile else we hit stack too deep
-            _handleRewardTransfer(token, IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]));
+            lastDifference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]);
+            _handleRewardTransfer(token, lastDifference);
         }
 
-        // TODO: notifyReceiver if at least one token balance is non-zero
+        // If the last diff non-zero then notify -> Proof of non-zero
+        if(lastDifference > 0) {
+            _notifyBribesProcessor();
+        }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
         require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
@@ -363,7 +370,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
             _sendBadgerToTree(amount);
         } else {
         // NOTE: All other tokens are sent to bribes processor
-            bribesPro_sentTokenToBribesProcessor(token, amount);
+            _sendTokenToBribesProcessor(token, amount);
         }
     }
 
@@ -373,7 +380,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     }
 
     /// @dev Send funds to the bribes receiver
-    function bribesPro_sentTokenToBribesProcessor(address token, uint256 amount) internal {
+    function _sendTokenToBribesProcessor(address token, uint256 amount) internal {
         IERC20Upgradeable(token).safeTransfer(BRIBES_PROCESSOR, amount);
         emit RewardsCollected(token, amount);
     }
