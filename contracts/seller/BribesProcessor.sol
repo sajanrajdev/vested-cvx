@@ -8,5 +8,6 @@ contract BribesProcessor is VotiumBribesProcessor {
   /// DO NOT CHANGE THIS
   /// Chanding this file breaks trust in the code (untested)
 
+  /// @notice We do need the constructor
   constructor(address _pricer) VotiumBribesProcessor(_pricer) {}
 }

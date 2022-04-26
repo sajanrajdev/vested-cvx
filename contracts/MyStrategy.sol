@@ -64,7 +64,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);
     
     // We hardcode, an upgrade is required to change this as it's a meaningful change
-    address public constant BRIBES_RECEIVER = 0x6F76C6A1059093E21D8B1C13C4e20D8335e2909F;
+    address public constant BRIBES_PROCESSOR = 0x53a2Ea9c137771931737034081005400785fb811;
     
     // We emit badger through the tree to the vault holders
     address public constant BADGER = 0x3472A5A71965499acd81997a54BBA8D852C6E53d;
@@ -180,7 +180,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     /// @dev Function to move rewards that are not protected
     /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
     /// @notice because token paths are harcoded, this function is safe to be called by anyone
-    /// @notice Will not notify the bribesProcessor as this could be triggered outside bribes
+    /// @notice Will not notify the BRIBES_PROCESSOR as this could be triggered outside bribes
     function sweepRewardToken(address token) public nonReentrant {
         _onlyGovernanceOrStrategist();
         _onlyNotProtectedTokens(token);
@@ -211,14 +211,14 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
         if(excessAmount == 0) { return; }
 
-        _sentTokenToBribesReceiver(want, excessAmount);
+        bribesPro_sentTokenToBribesProcessor(want, excessAmount);
 
         // getPricePerFullShare == balance().mul(1e18).div(totalSupply())
         require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
     }
 
     /// @dev given a token address, and convexAddress claim that as reward from CVX Extra Rewards
-    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
+    /// @notice funds are transfered to the hardcoded address BRIBES_PROCESSOR
     function claimBribeFromConvex (ICVXBribes convexAddress, address token) external nonReentrant {
         _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
@@ -363,18 +363,18 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
             _sendBadgerToTree(amount);
         } else {
         // NOTE: All other tokens are sent to bribes processor
-            _sentTokenToBribesReceiver(token, amount);
+            bribesPro_sentTokenToBribesProcessor(token, amount);
         }
     }
 
     /// @dev Notify the BribesProcessor that a new round of bribes has happened
     function _notifyBribesProcessor() internal {
-        IBribesProcessor(BRIBES_RECEIVER).notifyNewRound();
+        IBribesProcessor(BRIBES_PROCESSOR).notifyNewRound();
     }
 
     /// @dev Send funds to the bribes receiver
-    function _sentTokenToBribesReceiver(address token, uint256 amount) internal {
-        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, amount);
+    function bribesPro_sentTokenToBribesProcessor(address token, uint256 amount) internal {
+        IERC20Upgradeable(token).safeTransfer(BRIBES_PROCESSOR, amount);
         emit RewardsCollected(token, amount);
     }
 

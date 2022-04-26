@@ -19,6 +19,8 @@ from config import (
 from dotmap import DotMap
 import pytest
 
+VOTIUM_TREE = "0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A"
+
 
 """
 Tests for the Bribes functonality, to be run after upgrades
@@ -26,58 +28,16 @@ These tests must be run on mainnet-fork
 On separate file to avoid wasting time
 """
 
-SETT_ADDRESS = "0xfd05D3C7fe2924020620A8bE4961bBaA747e6305"
-
-STRAT_ADDRESS = "0x3ff634ce65cDb8CC0D569D6d1697c41aa666cEA9"
-
-VOTIUM_TREE = "0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A"
-
-CVX_EXTRA_REWARDS = "0xDecc7d761496d30F30b92Bdf764fb8803c79360D"
-
-@pytest.fixture
-def vault_proxy():
-    return SettV4.at(SETT_ADDRESS)
-
-@pytest.fixture
-def controller_proxy(vault_proxy):
-    return Controller.at(vault_proxy.controller())
-
-@pytest.fixture
-def strat_proxy():
-    return MyStrategy.at(STRAT_ADDRESS)
-
-@pytest.fixture
-def proxy_admin():
-    """
-    Verify by doing web3.eth.getStorageAt("STRAT_ADDRESS", int(
-        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
-    )).hex()
-    """
-    return Contract.from_explorer("0x20dce41acca85e8222d6861aa6d23b6c941777bf")
-
-@pytest.fixture
-def proxy_admin_gov():
-    """
-        Also found at proxy_admin.owner()
-    """
-    return accounts.at("0x21cf9b77f88adf8f8c98d7e33fe601dc57bc0893", force=True)
-
-@pytest.fixture
-def upgraded_strat(vault_proxy, controller_proxy, deployer, strat_proxy, proxy_admin, proxy_admin_gov):
-    new_strat_logic = MyStrategy.deploy({"from": deployer})
-    proxy_admin.upgrade(strat_proxy, new_strat_logic, {"from": proxy_admin_gov})
-    return strat_proxy
-
 @pytest.fixture
 def bribes_receiver(upgraded_strat):
-    return upgraded_strat.BRIBES_RECEIVER()
+    return upgraded_strat.BRIBES_PROCESSOR()
 @pytest.fixture
 def badger_tree(upgraded_strat):
     return upgraded_strat.BADGER_TREE()
 
 @pytest.fixture
 def bribes_receiver(upgraded_strat):
-    return upgraded_strat.BRIBES_RECEIVER()
+    return upgraded_strat.BRIBES_PROCESSOR()
 
 @pytest.fixture
 def real_strategist(upgraded_strat):
