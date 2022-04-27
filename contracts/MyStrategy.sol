@@ -359,7 +359,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
             }
         }
 
-        // If the last diff non-zero then notify -> Proof of non-zero
+        // If at least one diff is non-zero
         if(nonZeroDiff) {
             _notifyBribesProcessor();
         }
