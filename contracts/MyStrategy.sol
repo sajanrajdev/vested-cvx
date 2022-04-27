@@ -30,6 +30,7 @@ import {BaseStrategy} from "../deps/BaseStrategy.sol";
  * V1.4 Updated Claiming mechanism to allow claiming any token (using difference in balances)
  * V1.5 Unlocks are permissioneless, added Chainlink Keepeers integration
  * V1.6 New Locker, work towards fully permissioneless claiming // Protected Launch
+ * V1.7 Integration with onChain BribesProcessor
  */
 contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -430,7 +431,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.6";
+        return "1.7";
     }
 
     /// @dev Balance of want currently held in strategy positions
