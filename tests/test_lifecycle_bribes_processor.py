@@ -1,9 +1,6 @@
-from numpy import real
 import pytest
 import brownie
 from brownie import *
-from helpers.constants import MaxUint256
-from eth_utils import encode_hex
 from helpers.constants import EmptyBytes32
 
 """
