@@ -260,17 +260,21 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         convexAddress.getRewards(address(this), tokens);
 
 
-        uint256 lastDifference; // Cached value but also to check if we need to notifyProcessor
+        bool nonZeroDiff; // Cached value but also to check if we need to notifyProcessor
         // Ultimately it's proof of non-zero which is good enough
 
         // Send reward to Multisig
         for(uint x = 0; x < length; x++){
             address token = tokens[x];
-            lastDifference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[x]);
-            _handleRewardTransfer(tokens[x], lastDifference);
+            uint256 difference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[x]);
+
+            if(difference > 0){
+                nonZeroDiff = true;
+                _handleRewardTransfer(token, difference);
+            }
         }
 
-        if(lastDifference > 0) {
+        if(nonZeroDiff) {
             _notifyBribesProcessor();
         }
 
@@ -343,17 +347,20 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
         votiumTree.claimMulti(account, request);
 
-        uint256 lastDifference; // Cached value but also to check if we need to notifyProcessor
+        bool nonZeroDiff; // Cached value but also to check if we need to notifyProcessor
         // Ultimately it's proof of non-zero which is good enough
 
         for(uint i = 0; i < tokens.length; i++){
             address token = tokens[i]; // Caching it allows it to compile else we hit stack too deep
-            lastDifference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]);
-            _handleRewardTransfer(token, lastDifference);
+            uint256 difference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]);
+            if(difference > 0){
+                nonZeroDiff = true;
+                _handleRewardTransfer(token, difference);
+            }
         }
 
         // If the last diff non-zero then notify -> Proof of non-zero
-        if(lastDifference > 0) {
+        if(nonZeroDiff) {
             _notifyBribesProcessor();
         }
 
