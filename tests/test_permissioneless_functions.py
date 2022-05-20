@@ -34,7 +34,7 @@ def test_manual_skim_after_donation(setup_strat, vault, want, deployer):
   assert after_ppfs > initial_ppfs
 
   ## Skim here
-  bribes_receiver = setup_strat.BRIBES_RECEIVER()
+  bribes_receiver = setup_strat.BRIBES_PROCESSOR()
   before_balance_receiver = want.balanceOf(bribes_receiver)
 
   setup_strat.skim({"from": deployer})

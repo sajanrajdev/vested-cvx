@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.11;
+pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -14,11 +14,11 @@ import "../interfaces/badger/IController.sol";
 import "../interfaces/cvx/ICvxLocker.sol";
 import "../interfaces/cvx/ICVXBribes.sol";
 import "../interfaces/cvx/IVotiumBribes.sol";
+import "../interfaces/badger/IBribesProcessor.sol";
 import "../interfaces/snapshot/IDelegateRegistry.sol";
 import "../interfaces/curve/ICurvePool.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 
 /**
@@ -30,6 +30,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * V1.4 Updated Claiming mechanism to allow claiming any token (using difference in balances)
  * V1.5 Unlocks are permissioneless, added Chainlink Keepeers integration
  * V1.6 New Locker, work towards fully permissioneless claiming // Protected Launch
+ * V1.7 Integration with onChain BribesProcessor
  */
 contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -64,7 +65,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     IVotiumBribes public constant VOTIUM_BRIBE_CLAIMER = IVotiumBribes(0x378Ba9B73309bE80BF4C2c027aAD799766a7ED5A);
     
     // We hardcode, an upgrade is required to change this as it's a meaningful change
-    address public constant BRIBES_RECEIVER = 0x6F76C6A1059093E21D8B1C13C4e20D8335e2909F;
+    address public constant BRIBES_PROCESSOR = 0xbeD8f323456578981952e33bBfbE80D23289246B;
     
     // We emit badger through the tree to the vault holders
     address public constant BADGER = 0x3472A5A71965499acd81997a54BBA8D852C6E53d;
@@ -180,6 +181,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
     /// @dev Function to move rewards that are not protected
     /// @notice Only not protected, moves the whole amount using _handleRewardTransfer
     /// @notice because token paths are harcoded, this function is safe to be called by anyone
+    /// @notice Will not notify the BRIBES_PROCESSOR as this could be triggered outside bribes
     function sweepRewardToken(address token) public nonReentrant {
         _onlyGovernanceOrStrategist();
         _onlyNotProtectedTokens(token);
@@ -210,16 +212,15 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
         if(excessAmount == 0) { return; }
 
-        _sentTokenToBribesReceiver(want, excessAmount);
-        // Check that ppfs is 1, back to peg
+        _sendTokenToBribesProcessor(want, excessAmount);
 
         // getPricePerFullShare == balance().mul(1e18).div(totalSupply())
         require(_getBalance() == _getTotalSupply()); // Proof we skimmed only back to 1 ppfs
     }
 
     /// @dev given a token address, and convexAddress claim that as reward from CVX Extra Rewards
-    /// @notice funds are transfered to the hardcoded address BRIBES_RECEIVER
-    function claimBribeFromConvex (ICVXBribes convexAddress, address token) external nonReentrant {
+    /// @notice funds are transfered to the hardcoded address BRIBES_PROCESSOR
+    function claimBribeFromConvex(ICVXBribes convexAddress, address token) external nonReentrant {
         _onlyGovernanceOrStrategist();
         uint256 beforeVaultBalance = _getBalance();
         uint256 beforePricePerFullShare = _getPricePerFullShare();
@@ -230,7 +231,12 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         convexAddress.getReward(address(this), token);
         uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
 
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+        uint256 difference = afterBalance.sub(beforeBalance);
+        _handleRewardTransfer(token, difference);
+
+        if(difference > 0) {
+            _notifyBribesProcessor();
+        }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
         require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
@@ -254,9 +260,23 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         // Claim reward for tokens
         convexAddress.getRewards(address(this), tokens);
 
+
+        bool nonZeroDiff; // Cached value but also to check if we need to notifyProcessor
+        // Ultimately it's proof of non-zero which is good enough
+
         // Send reward to Multisig
         for(uint x = 0; x < length; x++){
-            _handleRewardTransfer(tokens[x], IERC20Upgradeable(tokens[x]).balanceOf(address(this)).sub(beforeBalance[x]));
+            address token = tokens[x];
+            uint256 difference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[x]);
+
+            if(difference > 0){
+                nonZeroDiff = true;
+                _handleRewardTransfer(token, difference);
+            }
+        }
+
+        if(nonZeroDiff) {
+            _notifyBribesProcessor();
         }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
@@ -281,7 +301,13 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         votiumTree.claim(token, index, account, amount, merkleProof);
         uint256 afterBalance = IERC20Upgradeable(token).balanceOf(address(this));
 
-        _handleRewardTransfer(token, afterBalance.sub(beforeBalance));
+        uint256 difference = afterBalance.sub(beforeBalance);
+
+        _handleRewardTransfer(token, difference);
+
+        if(difference > 0) {
+            _notifyBribesProcessor();
+        }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
         require(beforePricePerFullShare == _getPricePerFullShare(), "Ppfs can't change");
@@ -322,9 +348,21 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
         votiumTree.claimMulti(account, request);
 
+        bool nonZeroDiff; // Cached value but also to check if we need to notifyProcessor
+        // Ultimately it's proof of non-zero which is good enough
+
         for(uint i = 0; i < tokens.length; i++){
             address token = tokens[i]; // Caching it allows it to compile else we hit stack too deep
-            _handleRewardTransfer(token, IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]));
+            uint256 difference = IERC20Upgradeable(token).balanceOf(address(this)).sub(beforeBalance[i]);
+            if(difference > 0){
+                nonZeroDiff = true;
+                _handleRewardTransfer(token, difference);
+            }
+        }
+
+        // If at least one diff is non-zero
+        if(nonZeroDiff) {
+            _notifyBribesProcessor();
         }
 
         require(beforeVaultBalance == _getBalance(), "Balance can't change");
@@ -339,14 +377,19 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
         if (token == BADGER){
             _sendBadgerToTree(amount);
         } else {
-        // NOTE: All other tokens are sent to multisig
-            _sentTokenToBribesReceiver(token, amount);
+        // NOTE: All other tokens are sent to bribes processor
+            _sendTokenToBribesProcessor(token, amount);
         }
     }
 
+    /// @dev Notify the BribesProcessor that a new round of bribes has happened
+    function _notifyBribesProcessor() internal {
+        IBribesProcessor(BRIBES_PROCESSOR).notifyNewRound();
+    }
+
     /// @dev Send funds to the bribes receiver
-    function _sentTokenToBribesReceiver(address token, uint256 amount) internal {
-        IERC20Upgradeable(token).safeTransfer(BRIBES_RECEIVER, amount);
+    function _sendTokenToBribesProcessor(address token, uint256 amount) internal {
+        IERC20Upgradeable(token).safeTransfer(BRIBES_PROCESSOR, amount);
         emit RewardsCollected(token, amount);
     }
 
@@ -388,7 +431,7 @@ contract MyStrategy is BaseStrategy, ReentrancyGuardUpgradeable {
 
     /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
-        return "1.6";
+        return "1.7";
     }
 
     /// @dev Balance of want currently held in strategy positions
